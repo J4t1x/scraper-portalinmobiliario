@@ -1,0 +1,40 @@
+# Placeholder para futuro auto-deploy a Railway
+# Este workflow se activará cuando se configure Railway con GitHub
+
+name: Deploy to Railway
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    # TODO: Configurar Railway CLI y deployment
+    # Instrucciones:
+    # 1. Instalar Railway en el proyecto: railway init
+    # 2. Obtener Railway token: railway login
+    # 3. Agregar RAILWAY_TOKEN a GitHub Secrets
+    # 4. Descomentar los siguientes steps:
+    
+    # - name: Install Railway CLI
+    #   run: npm install -g @railway/cli
+    #   
+    # - name: Deploy to Railway
+    #   env:
+    #     RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+    #   run: railway up
+    
+    - name: Placeholder
+      run: |
+        echo "Railway deployment no configurado aún"
+        echo "Ver DOCKER.md para instrucciones de deployment manual"
+        echo "Para habilitar auto-deploy:"
+        echo "1. Conectar Railway con GitHub desde railway.app"
+        echo "2. Railway desplegará automáticamente en cada push"

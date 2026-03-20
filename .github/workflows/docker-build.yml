@@ -1,0 +1,38 @@
+name: Docker Build and Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Build Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        push: false
+        tags: portalinmobiliario:test
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        
+    - name: Test Docker image
+      run: |
+        docker run --rm portalinmobiliario:test python --version
+        docker run --rm portalinmobiliario:test google-chrome --version
+        docker run --rm portalinmobiliario:test chromedriver --version
+        
+    - name: Run help command
+      run: |
+        docker run --rm portalinmobiliario:test python main.py --help
