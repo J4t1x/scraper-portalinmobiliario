@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # Servicio principal: scraper
+  scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: portalinmobiliario-scraper
+    environment:
+      - DATABASE_URL=postgresql://scraper:scraper123@postgres:5432/portalinmobiliario
+      - DELAY_BETWEEN_REQUESTS=${DELAY_BETWEEN_REQUESTS:-2}
+      - MAX_RETRIES=${MAX_RETRIES:-3}
+      - TIMEOUT=${TIMEOUT:-30}
+      - USER_AGENT=${USER_AGENT:-Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36}
+    volumes:
+      # Volumen para output (opcional, para desarrollo)
+      - ./output:/app/output
+      # Volumen para código (solo para desarrollo, comentar en producción)
+      - ./main.py:/app/main.py
+      - ./scraper_selenium.py:/app/scraper_selenium.py
+      - ./exporter.py:/app/exporter.py
+      - ./config.py:/app/config.py
+      - ./utils.py:/app/utils.py
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - scraper-network
+    # Comando por defecto (puede ser sobrescrito)
+    command: ["python", "main.py", "--help"]
+    # Para modo interactivo
+    stdin_open: true
+    tty: true
+
+  # Base de datos PostgreSQL (para testing local)
+  postgres:
+    image: postgres:15-alpine
+    container_name: portalinmobiliario-db
+    environment:
+      - POSTGRES_USER=scraper
+      - POSTGRES_PASSWORD=scraper123
+      - POSTGRES_DB=portalinmobiliario
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Script de inicialización (crear si es necesario)
+      # - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - scraper-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scraper"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Adminer (opcional, para gestión de BD)
+  adminer:
+    image: adminer:latest
+    container_name: portalinmobiliario-adminer
+    ports:
+      - "8080:8080"
+    networks:
+      - scraper-network
+    depends_on:
+      - postgres
+
+networks:
+  scraper-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+    driver: local

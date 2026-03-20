@@ -1,0 +1,58 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environment files
+.env
+
+# Output files (se generan en runtime)
+output/
+*.txt
+*.json
+*.csv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation (no necesaria en imagen)
+prd.md
+QUICKSTART.md
+
+# Docker files
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# GitHub
+.github/
+
+# Logs
+*.log
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# IMPORTANTE: NO ignorar venv/ - se mantiene en la imagen
+# venv/ <- comentado intencionalmente
