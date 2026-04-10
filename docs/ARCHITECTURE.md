@@ -141,7 +141,28 @@ def export_to_csv(properties: List[Dict], operacion: str, tipo: str, flatten_nes
 def flatten_property(prop: Dict) -> Dict
 ```
 
-### 3. Validator (`validator.py`)
+### 3. Data Loader (`data_loader.py`)
+
+**Clase:** `JSONDataLoader`
+
+**Responsabilidades:**
+- Leer archivos JSON desde carpeta `output/`
+- Parsear estructura `{ metadata: {...}, propiedades: [...] }`
+- Combinar propiedades de múltiples archivos
+- Filtrar por operación, tipo, rango de precio, búsqueda de texto
+- Calcular estadísticas (total, distribución)
+- Implementar paginación de resultados
+
+**Métodos clave:**
+```python
+def load_all_json_files() -> List[Dict]
+def load_by_filters(operacion, tipo, precio_min, precio_max, search) -> List[Dict]
+def get_stats() -> Dict
+def paginate(properties, page, per_page) -> Dict
+def _extract_price_clp(price_str) -> Optional[float]
+```
+
+### 4. Validator (`validator.py`)
 
 **Responsabilidades:**
 - Validar integridad de datos
@@ -149,7 +170,7 @@ def flatten_property(prop: Dict) -> Dict
 - Detectar campos faltantes
 - Generar reportes de calidad
 
-### 4. Deduplicator (`deduplicator.py`)
+### 5. Deduplicator (`deduplicator.py`)
 
 **Responsabilidades:**
 - Detectar propiedades duplicadas por ID
@@ -204,14 +225,28 @@ def get_executions(job_id, limit) -> List[Dict]
 - Consulta de ejecuciones históricas
 - Configuración de jobs predefinidos
 
+**Implementación (SPEC-011):**
+- Flask-RESTX para documentación Swagger
+- Integración con ScraperScheduler
+- Validación de inputs
+- Manejo de errores y logging
+
 **Endpoints:**
-- `GET /api/scheduler/status` - Estado del scheduler
+- `GET /api/scheduler/status` - Estado del scheduler (running, paused, stopped)
 - `POST /api/scheduler/start` - Iniciar scheduler
 - `POST /api/scheduler/stop` - Detener scheduler
-- `GET /api/scheduler/jobs` - Listar jobs
-- `POST /api/scheduler/jobs` - Agregar job
+- `POST /api/scheduler/pause` - Pausar scheduler
+- `POST /api/scheduler/resume` - Reanudar scheduler
+- `GET /api/scheduler/jobs` - Listar jobs configurados
+- `GET /api/scheduler/jobs/<id>` - Obtener detalle de un job
+- `POST /api/scheduler/jobs` - Agregar job personalizado
 - `DELETE /api/scheduler/jobs/<id>` - Remover job
-- `GET /api/scheduler/executions` - Historial de ejecuciones
+- `POST /api/scheduler/jobs/<id>/pause` - Pausar job específico
+- `POST /api/scheduler/jobs/<id>/resume` - Reanudar job específico
+- `GET /api/scheduler/executions` - Historial de ejecuciones (paginado)
+- `GET /api/scheduler/executions/<job_id>` - Ejecuciones de un job específico
+- `POST /api/scheduler/setup-default` - Configurar jobs predefinidos (SPEC-012)
+- `GET /api/scheduler/heartbeat` - Actualizar heartbeat
 
 ### 9. Dashboard Web (`app.py`)
 

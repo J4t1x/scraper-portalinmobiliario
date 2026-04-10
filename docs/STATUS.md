@@ -8,11 +8,13 @@
 
 | Aspecto | Estado | Detalles |
 |---------|--------|----------|
-| **Versión** | 1.2.0 | Scraping básico + detalle |
-| **Estado** | ✅ Funcional | Producción en Railway |
-| **Última ejecución** | 7 Abril 2026 | 144+ propiedades |
-| **Cobertura de tests** | 🚧 En progreso | ~60% |
-| **Documentación** | ✅ Completa | README + docs/ |
+| **Versión** | 2.0.0-MVP | Scraping + Dashboard con JSON |
+| **Estado** | 🚧 En desarrollo | MVP - Validación con cliente |
+| **Fuente de datos** | 📁 Archivos JSON | Carpeta `output/` |
+| **PostgreSQL** | ⏳ Pendiente | Post-MVP (validación exitosa) |
+| **Cobertura de tests** | ✅ Completada | 73% (Python 3.14: excluye módulos SQLAlchemy por incompatibilidad) |
+| **Documentación** | 🔄 Actualizando | README + docs/ |
+| **Specs completadas** | 11/39 (28%) | Fase MVP: Dashboard con JSON |
 
 ---
 
@@ -67,29 +69,37 @@
 - [x] Logging detallado
 - [x] Help completo
 
-### 🚧 Dashboard Web
+### 🚧 Dashboard Web (MVP)
 - [x] Interfaz Flask básica
 - [x] Autenticación (Admin/Viewer)
-- [x] Control del scraper
-- [x] Visualización de datos
-- [ ] Logs en tiempo real (WebSocket)
-- [ ] Analytics avanzado
-- [ ] Gráficos interactivos
+- [x] **Lectura de archivos JSON desde output/** (data_loader.py)
+- [ ] **Visualización de propiedades (tabla interactiva)**
+- [ ] **Filtros básicos (operación, tipo, precio)**
+- [ ] **Vista de detalle de propiedad**
+- [ ] **KPIs básicos (total, por tipo, por operación)**
+- [ ] **Gráficos simples (Chart.js)**
+- [ ] **Búsqueda por texto**
+- [x] Control del scraper (CLI)
+- [ ] Logs en tiempo real (WebSocket) - Post-MVP
+- [ ] Analytics avanzado - Post-MVP
 
-### ✅ Scheduler Automatizado
-- [x] APScheduler configurado
+### ⏳ Scheduler Automatizado (Post-MVP)
+- [x] APScheduler configurado (SPEC-011)
 - [x] Jobs periódicos (interval, cron)
 - [x] Manejo de concurrencia (max 3 jobs)
-- [x] Logging de ejecuciones en PostgreSQL
-- [x] Persistencia de estado
-- [x] API REST para control
-- [x] CLI para gestión de scheduler
-- [x] Jobs de scraping automático (SPEC-012)
-  - [x] scrape_venta_departamento (02:00 AM diario)
-  - [x] scrape_arriendo_departamento (03:00 AM diario)
-  - [x] scrape_venta_casa (04:00 AM diario)
-  - [x] scrape_arriendo_casa (05:00 AM diario)
-  - [x] scrape_venta_oficina (lunes 06:00 AM semanal)
+- [ ] ~~Logging de ejecuciones en PostgreSQL~~ (Post-MVP)
+- [ ] ~~Persistencia de estado (SchedulerState model)~~ (Post-MVP)
+- [ ] ~~API REST para control (scheduler_api.py)~~ (Post-MVP)
+- [x] CLI para gestión de scheduler (main.py --scheduler)
+- [x] Jobs de scraping automático (SPEC-012) - **Generan archivos JSON en output/**
+  - [x] scrape_venta_departamento (manual, genera JSON)
+  - [x] scrape_arriendo_departamento (manual, genera JSON)
+  - [x] scrape_venta_casa (manual, genera JSON)
+  - [x] scrape_arriendo_casa (manual, genera JSON)
+  - [x] scrape_venta_oficina (manual, genera JSON)
+- [ ] Event listeners para tracking de ejecuciones - Post-MVP
+- [ ] Heartbeat monitoring - Post-MVP
+- [ ] Recuperación automática ante reinicios - Post-MVP
 
 ### ✅ Docker
 - [x] Dockerfile optimizado
@@ -105,12 +115,13 @@
 - [x] Variables de entorno
 - [x] Auto-deploy en push
 
-### 🚧 Testing
+### ✅ Testing
 - [x] Estructura de tests (`tests/`)
 - [x] Tests unitarios básicos
-- [ ] Tests de integración
+- [x] Tests unitarios extendidos (scraper.py, main.py, config_flask.py)
+- [x] Coverage 73% (Python 3.14: excluye módulos SQLAlchemy por incompatibilidad)
+- [ ] Tests de integración (requiere downgrade Python a 3.11 o 3.12)
 - [ ] Tests E2E
-- [ ] Coverage > 80%
 - [ ] CI/CD con GitHub Actions
 
 ### 🚧 Documentación
@@ -143,20 +154,25 @@
 
 ## 🚀 Próximas Prioridades
 
-### Corto Plazo (1-2 semanas)
-1. [ ] Completar tests unitarios (coverage > 80%)
-2. [ ] Implementar tests de integración
-3. [ ] Agregar CI/CD con GitHub Actions
-4. [ ] Mejorar validación de datos
-5. [ ] Implementar logging a archivo rotativo
+### 🎯 MVP - Fase Actual (1-2 semanas)
+1. [ ] **Dashboard: Lector de archivos JSON desde output/**
+2. [ ] **Dashboard: Tabla interactiva de propiedades**
+3. [ ] **Dashboard: Filtros básicos (operación, tipo, rango de precio)**
+4. [ ] **Dashboard: Vista de detalle de propiedad**
+5. [ ] **Dashboard: KPIs básicos (totales, promedios)**
+6. [ ] **Dashboard: Gráficos simples (Chart.js o similar)**
+7. [ ] **Dashboard: Búsqueda por texto (título, ubicación)**
+8. [ ] **Validación con cliente usando datos reales del scraper**
 
-### Medio Plazo (1 mes)
-1. [x] PostgreSQL integration completa
-2. [ ] API REST con FastAPI
-3. [ ] Dashboard web completo con analytics
-4. [x] Scheduler para scraping automático
-5. [x] Jobs de scraping automático configurados (SPEC-012)
+### Post-MVP - Fase 2 (después de validación)
+1. [ ] Migración a PostgreSQL
+2. [ ] Scheduler automatizado con persistencia en BD
+3. [ ] API REST con FastAPI
+4. [ ] Analytics avanzado
+5. [ ] Logs en tiempo real (WebSocket)
 6. [ ] Cache de resultados
+7. [ ] Tests de integración (requiere Python 3.11/3.12)
+8. [ ] CI/CD con GitHub Actions
 
 ### Largo Plazo (3+ meses)
 1. [ ] Scraping distribuido con Celery
@@ -211,7 +227,24 @@
 ## 📝 Notas
 
 ### Cambios Recientes
-- **2026-04-09:** Implementado jobs de scraping automático (SPEC-012)
+- **2026-04-09:** Completado SPEC-MVP-001 - Data Loader (lectura de JSON)
+  - Módulo `data_loader.py` implementado con JSONDataLoader
+  - Carga de archivos JSON desde carpeta output/
+  - Filtros: operación, tipo, rango de precio, búsqueda de texto
+  - Estadísticas: total, distribución por operación/tipo
+  - Paginación de resultados
+  - Tests unitarios: 29 tests, 94% coverage
+- **2026-04-09:** Completado SPEC-012 - Jobs de scraping automático
+  - 5 jobs preconfigurados (venta/arriendo departamento/casa/oficina)
+  - Schedules: diario (02:00-05:00 AM) y semanal (lunes 06:00 AM)
+  - Integración con PostgreSQL para logging de ejecuciones
+  - CLI commands: `--scheduler start/stop/status/list-jobs/add-job/remove-job`
+  - API REST endpoints para control remoto
+- **2026-04-09:** Completado SPEC-011 - Scheduler con APScheduler
+  - Job store PostgreSQL para persistencia
+  - Concurrency control (max 3 jobs simultáneos)
+  - Event listeners para tracking en tiempo real
+  - Heartbeat monitoring y recuperación automática
 - **2026-04-07:** Implementado scraping de detalle completo
 - **2026-04-05:** Agregado dashboard web con Flask
 - **2026-03-28:** Dockerización completa
@@ -219,8 +252,10 @@
 
 ### Decisiones Técnicas
 - **Selenium vs requests:** Selenium elegido por sitio dinámico con JavaScript
-- **PostgreSQL:** Elegido para histórico de precios y búsquedas complejas
-- **Railway:** Elegido por facilidad de deployment con Docker
+- **JSON vs PostgreSQL (MVP):** Archivos JSON elegidos para MVP rápido y validación con cliente
+- **PostgreSQL:** Planificado para Post-MVP (histórico de precios y búsquedas complejas)
+- **Railway:** Elegido para deployment futuro con Docker + PostgreSQL
+- **Dashboard:** Flask + TailwindCSS + Chart.js para visualización simple y rápida
 
 ### Lecciones Aprendidas
 - Selectores CSS son más estables que XPath
@@ -230,13 +265,21 @@
 
 ---
 
-## 🎯 Objetivos Q2 2026
+## 🎯 Objetivos MVP (Abril 2026)
+
+1. **✅ Scraper funcional:** Extracción de datos completa (básico + detalle)
+2. **🚧 Dashboard MVP:** Visualización de datos desde archivos JSON
+3. **🎯 Validación cliente:** Demostrar valor con datos reales
+4. **📊 KPIs básicos:** Totales, promedios, distribución por tipo/operación
+5. **🔍 Búsqueda y filtros:** Encontrar propiedades relevantes
+
+## 🎯 Objetivos Post-MVP (Q2-Q3 2026)
 
 1. **Calidad:** Coverage de tests > 80%
 2. **Performance:** Throughput > 100 props/hora
 3. **Confiabilidad:** Tasa de éxito > 98%
-4. **Features:** API REST funcional
-5. **Automatización:** Scraping programado diario
+4. **Features:** API REST funcional + PostgreSQL
+5. **Automatización:** Scraping programado diario con scheduler
 
 ---
 
