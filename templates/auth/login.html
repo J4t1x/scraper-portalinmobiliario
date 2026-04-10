@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Portal Inmobiliario Scraper{% endblock %}
+
+{% block auth_content %}
+<div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100">
+    <div class="max-w-md w-full mx-4">
+        <div class="bg-white rounded-2xl shadow-xl p-8">
+            <!-- Logo y título -->
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+                    <i data-lucide="home" class="w-8 h-8 text-blue-600"></i>
+                </div>
+                <h2 class="text-3xl font-bold text-slate-900">Portal Inmobiliario</h2>
+                <p class="text-slate-600 mt-2">Scraper Dashboard</p>
+            </div>
+            
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="mb-6 space-y-2">
+                        {% for category, message in messages %}
+                            <div class="p-4 rounded-lg {% if category == 'error' %}bg-red-100 text-red-800{% elif category == 'success' %}bg-green-100 text-green-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+            
+            <!-- Formulario de login -->
+            <form method="POST" action="{{ url_for('main.login') }}" class="space-y-6">
+                <div>
+                    <label for="username" class="block text-sm font-medium text-slate-700 mb-2">
+                        Usuario
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i data-lucide="user" class="w-5 h-5 text-slate-400"></i>
+                        </div>
+                        <input 
+                            type="text" 
+                            id="username" 
+                            name="username" 
+                            required
+                            class="block w-full pl-10 pr-3 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                            placeholder="Ingresa tu usuario"
+                        >
+                    </div>
+                </div>
+                
+                <div>
+                    <label for="password" class="block text-sm font-medium text-slate-700 mb-2">
+                        Contraseña
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i data-lucide="lock" class="w-5 h-5 text-slate-400"></i>
+                        </div>
+                        <input 
+                            type="password" 
+                            id="password" 
+                            name="password" 
+                            required
+                            class="block w-full pl-10 pr-3 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                            placeholder="Ingresa tu contraseña"
+                        >
+                    </div>
+                </div>
+                
+                <div class="flex items-center">
+                    <input 
+                        type="checkbox" 
+                        id="remember" 
+                        name="remember" 
+                        class="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                    >
+                    <label for="remember" class="ml-2 text-sm text-slate-700">
+                        Recordarme
+                    </label>
+                </div>
+                
+                <button 
+                    type="submit" 
+                    class="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition"
+                >
+                    <i data-lucide="log-in" class="w-5 h-5"></i>
+                    <span>Iniciar Sesión</span>
+                </button>
+            </form>
+            
+            <!-- Credenciales de prueba -->
+            <div class="mt-8 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <p class="text-xs font-medium text-slate-700 mb-2">Credenciales de prueba:</p>
+                <div class="space-y-1 text-xs text-slate-600">
+                    <p><strong>Admin:</strong> admin / admin123</p>
+                    <p><strong>Viewer:</strong> viewer / viewer123</p>
+                </div>
+            </div>
+        </div>
+        
+        <p class="text-center text-sm text-slate-600 mt-6">
+            Portal Inmobiliario Scraper Dashboard v1.0.0
+        </p>
+    </div>
+</div>
+{% endblock %}

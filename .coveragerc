@@ -1,0 +1,35 @@
+[run]
+source = .
+omit =
+    venv/*
+    tests/*
+    __pycache__/*
+    .tox/*
+    .eggs/*
+    *.egg-info/*
+    setup.py
+    dashboard/*
+    data/*
+    logs/*
+    output/*
+branch = True
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    if self.debug:
+    if settings.DEBUG
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    class .*\bProtocol\):
+    @(abc\.)?abstractmethod
+    if TYPE_CHECKING:
+    \.\.\.
+show_missing = True
+skip_covered = False
+fail_under = 80
+
+[html]
+directory = htmlcov

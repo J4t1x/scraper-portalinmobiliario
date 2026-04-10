@@ -32,6 +32,11 @@ output/
 *.json
 *.csv
 
+# Dashboard
+data/users.json
+logs/*.log
+logs/*.json
+
 # IDE
 .vscode/
 .idea/

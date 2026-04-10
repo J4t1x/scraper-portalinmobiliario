@@ -1,15 +1,11 @@
 import requests
 from bs4 import BeautifulSoup
 import time
-import logging
 from typing import List, Dict, Optional
 from config import Config
+from logger_config import get_logger
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class PortalInmobiliarioScraper:

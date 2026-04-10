@@ -1,86 +1,140 @@
-# 📚 Documentación - Portal Inmobiliario Scraper
+# 📚 Documentación — Portal Inmobiliario Scraper
 
-**Última actualización:** 20 de Marzo, 2026
-
-## 📋 Índice de Documentación
-
-### 🚀 Guías de Inicio Rápido
-- **[QUICKSTART.md](guides/QUICKSTART.md)** - Inicio rápido (instalación local)
-- **[QUICKSTART-DOCKER.md](deployment/QUICKSTART-DOCKER.md)** - Inicio rápido con Docker
-
-### 🐳 Deployment
-- **[DOCKER.md](deployment/DOCKER.md)** - Guía completa de Docker y Railway
-- **[DEPLOYMENT-SUMMARY.md](deployment/DEPLOYMENT-SUMMARY.md)** - Resumen de dockerización
-
-### 📐 Especificaciones
-- **[prd.md](specs/prd.md)** - Product Requirements Document
-
-### 📖 Documentación Principal
-- **[README.md](../README.md)** - Documentación general del proyecto (raíz)
+**Última actualización:** Abril 2026
 
 ---
 
-## 🗂️ Estructura de Documentación
+## � Índice de Documentación
+
+### 🎯 Documentación Principal
+- [**ARCHITECTURE**](ARCHITECTURE.md) — Arquitectura del sistema
+- [**STATUS**](STATUS.md) — Estado actual del proyecto
+- [**CONVENTIONS**](CONVENTIONS.md) — Convenciones de código
+- [**ORGANIZATION**](ORGANIZATION.md) — Organización de la documentación
+
+### 📖 Guías
+- [**QUICKSTART**](guides/QUICKSTART.md) — Guía de inicio rápido (5 minutos)
+
+### � Deployment
+- [**Docker**](deployment/DOCKER.md) — Guía completa de Docker y Railway
+- [**Docker Quickstart**](deployment/QUICKSTART-DOCKER.md) — Docker en 5 minutos
+- [**Railway**](deployment/RAILWAY.md) — Deployment en Railway
+
+### � Especificaciones
+- [**PRD**](specs/prd.md) — Product Requirements Document
+- [**Roadmap Completo**](ROADMAP-COMPLETO.md) — Roadmap detallado del proyecto
+
+---
+
+## 🎯 Propósito
+
+Esta carpeta contiene toda la documentación del proyecto **Portal Inmobiliario Scraper**, organizada por categorías para facilitar el acceso y mantenimiento.
+
+---
+
+## 📂 Estructura
 
 ```
 docs/
-├── README.md                    # Este archivo (índice maestro)
-├── deployment/                  # Guías de deployment
-│   ├── DOCKER.md               # Docker completo
-│   ├── QUICKSTART-DOCKER.md    # Docker rápido
-│   └── DEPLOYMENT-SUMMARY.md   # Resumen técnico
-├── guides/                      # Guías de uso
-│   └── QUICKSTART.md           # Inicio rápido local
-└── specs/                       # Especificaciones
-    └── prd.md                  # PRD original
+├── README.md                      # Este archivo (índice maestro)
+├── ARCHITECTURE.md                # Arquitectura del sistema
+├── STATUS.md                      # Estado actual del proyecto
+├── CONVENTIONS.md                 # Convenciones de código
+├── ORGANIZATION.md                # Organización de la documentación
+├── ROADMAP-COMPLETO.md            # Roadmap detallado
+├── guides/                        # Guías de uso
+│   └── QUICKSTART.md              # Inicio rápido
+├── deployment/                    # Guías de deployment
+│   ├── DOCKER.md                  # Docker completo
+│   ├── QUICKSTART-DOCKER.md       # Docker rápido
+│   └── RAILWAY.md                 # Railway
+└── specs/                         # Especificaciones
+    ├── prd.md                     # Product Requirements
+    ├── scraping-detail.md         # Spec de scraping de detalle
+    ├── dashboard-web.md           # Spec de dashboard web
+    ├── postgresql-integration.md  # Spec de PostgreSQL
+    └── api-rest.md                # Spec de API REST
 ```
 
 ---
 
-## 🎯 Navegación Rápida
+## 🚀 Inicio Rápido
+
+Si es tu primera vez con el proyecto:
+
+1. Lee [ARCHITECTURE.md](ARCHITECTURE.md) para entender el sistema
+2. Lee [QUICKSTART.md](guides/QUICKSTART.md) (5 minutos)
+3. Ejecuta el scraper localmente
+4. Revisa [DOCKER.md](deployment/DOCKER.md) para deployment
+
+---
+
+## 📖 Documentación por Tema
 
 ### Para Desarrolladores
-1. **Primera vez:** [QUICKSTART.md](guides/QUICKSTART.md)
-2. **Con Docker:** [QUICKSTART-DOCKER.md](deployment/QUICKSTART-DOCKER.md)
-3. **Deployment:** [DOCKER.md](deployment/DOCKER.md)
-
-### Para Product/Business
-1. **Visión del producto:** [prd.md](specs/prd.md)
-2. **Estado actual:** [README.md](../README.md)
+- [ARCHITECTURE.md](ARCHITECTURE.md) — Arquitectura y componentes
+- [CONVENTIONS.md](CONVENTIONS.md) — Patrones de código
+- [QUICKSTART.md](guides/QUICKSTART.md) — Setup y primer scraping
+- [PRD.md](specs/prd.md) — Requerimientos del producto
 
 ### Para DevOps
-1. **Dockerización:** [DOCKER.md](deployment/DOCKER.md)
-2. **Railway:** [DEPLOYMENT-SUMMARY.md](deployment/DEPLOYMENT-SUMMARY.md)
+- [DOCKER.md](deployment/DOCKER.md) — Build y deployment
+- [RAILWAY.md](deployment/RAILWAY.md) — Deployment en Railway
+- [QUICKSTART-DOCKER.md](deployment/QUICKSTART-DOCKER.md) — Docker rápido
+
+### Para Product Managers
+- [STATUS.md](STATUS.md) — Estado actual y métricas
+- [PRD.md](specs/prd.md) — Product Requirements
+- [ROADMAP-COMPLETO.md](ROADMAP-COMPLETO.md) — Roadmap completo
 
 ---
 
-## 📊 Estado del Proyecto
+## 🤖 AI Dev Engine
 
-### ✅ Completado
-- Scraper básico con Selenium
-- Exportación TXT/JSON/CSV
-- Paginación automática
-- Dockerización completa
-- Configuración Railway
+Este proyecto está integrado con el **AI Dev Engine** para desarrollo automatizado:
 
-### 🚧 En Progreso
-- Testing automatizado
-- CI/CD con GitHub Actions
+### Workflows Disponibles
+- `/cascade-dev-scraper` — Desarrollo automatizado con SDD
+- `/engine-validate` — Validación completa (tests, lint, security)
+- `/engine-observe` — Monitoreo de producción
+- `/portalinmobiliario-dev` — Workflow de desarrollo local
+- `/portalinmobiliario-github` — Subida a GitHub
 
-### 📋 Próximos Pasos
-- Scraping de página de detalle
-- Almacenamiento en PostgreSQL
-- Dashboard de monitoreo
+### Agentes Especializados
+- **Scraper Agent** — Desarrollo de scrapers
+- **Data Agent** — Validación y exportación de datos
+- **Test Agent** — Testing automatizado
+
+Ver `.windsurf/` para más detalles.
 
 ---
 
-## 🔗 Links Útiles
+## � Mantenimiento
+
+Esta documentación se actualiza regularmente. Última revisión: **Abril 2026**
+
+Para contribuir a la documentación:
+1. Edita el archivo correspondiente
+2. Actualiza la fecha de "Última actualización"
+3. Actualiza este README si es necesario
+4. Commit con mensaje descriptivo
+
+---
+
+## 📝 Notas
+
+- Todos los archivos están en formato Markdown
+- Los diagramas usan sintaxis Mermaid cuando es posible
+- Los ejemplos de código incluyen comentarios explicativos
+- Las guías están optimizadas para lectura rápida
+
+---
+
+**Última revisión:** Abril 2026
 
 - **Repositorio:** GitHub (configurar URL)
 - **Deployment:** Railway (configurar URL)
 - **Documentación API:** Pendiente
-
----
 
 ## 📝 Convenciones
 

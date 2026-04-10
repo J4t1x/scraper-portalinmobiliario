@@ -1,0 +1,30 @@
+<aside class="w-64 bg-white shadow-lg fixed left-0 top-16 bottom-0 overflow-y-auto border-r border-slate-200">
+    <nav class="p-4 space-y-2">
+        <a href="{{ url_for('main.dashboard') }}" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-50 transition {% if request.endpoint == 'main.dashboard' %}bg-blue-100 text-blue-700{% else %}text-slate-700{% endif %}">
+            <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+            <span class="font-medium">Dashboard</span>
+        </a>
+        
+        <a href="{{ url_for('main.scraper') }}" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-50 transition {% if request.endpoint == 'main.scraper' %}bg-blue-100 text-blue-700{% else %}text-slate-700{% endif %}">
+            <i data-lucide="play-circle" class="w-5 h-5"></i>
+            <span class="font-medium">Scraper</span>
+        </a>
+        
+        <a href="{{ url_for('main.data') }}" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-50 transition {% if request.endpoint == 'main.data' %}bg-blue-100 text-blue-700{% else %}text-slate-700{% endif %}">
+            <i data-lucide="database" class="w-5 h-5"></i>
+            <span class="font-medium">Datos</span>
+        </a>
+        
+        <a href="{{ url_for('main.analytics') }}" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-50 transition {% if request.endpoint == 'main.analytics' %}bg-blue-100 text-blue-700{% else %}text-slate-700{% endif %}">
+            <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+            <span class="font-medium">Analytics</span>
+        </a>
+    </nav>
+    
+    <div class="absolute bottom-0 left-0 right-0 p-4 bg-slate-50 border-t border-slate-200">
+        <div class="text-xs text-slate-500 text-center">
+            <p>Portal Inmobiliario Scraper</p>
+            <p class="mt-1">v1.0.0</p>
+        </div>
+    </div>
+</aside>

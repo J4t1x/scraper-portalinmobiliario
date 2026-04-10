@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Portal Inmobiliario Scraper{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-3xl font-bold text-slate-900">Dashboard</h1>
+        <div class="text-sm text-slate-600">
+            <i data-lucide="clock" class="w-4 h-4 inline"></i>
+            <span id="current-time"></span>
+        </div>
+    </div>
+    
+    <!-- KPIs Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="bg-white rounded-lg shadow p-6 border border-slate-200">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-slate-600 mb-1">Total Propiedades</p>
+                    <p class="text-3xl font-bold text-slate-900">0</p>
+                </div>
+                <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <i data-lucide="home" class="w-6 h-6 text-blue-600"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow p-6 border border-slate-200">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-slate-600 mb-1">Precio Promedio</p>
+                    <p class="text-3xl font-bold text-slate-900">$0</p>
+                </div>
+                <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                    <i data-lucide="dollar-sign" class="w-6 h-6 text-green-600"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow p-6 border border-slate-200">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-slate-600 mb-1">Archivos</p>
+                    <p class="text-3xl font-bold text-slate-900">0</p>
+                </div>
+                <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <i data-lucide="file-text" class="w-6 h-6 text-purple-600"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow p-6 border border-slate-200">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-slate-600 mb-1">Última Ejecución</p>
+                    <p class="text-lg font-bold text-slate-900">N/A</p>
+                </div>
+                <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                    <i data-lucide="activity" class="w-6 h-6 text-yellow-600"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Placeholder para gráficos -->
+    <div class="bg-white rounded-lg shadow p-6 border border-slate-200">
+        <h2 class="text-xl font-bold text-slate-900 mb-4">Gráficos y Análisis</h2>
+        <p class="text-slate-600">Los gráficos se implementarán en la Fase 3</p>
+    </div>
+</div>
+
+<script>
+    // Actualizar reloj
+    function updateTime() {
+        const now = new Date();
+        document.getElementById('current-time').textContent = now.toLocaleString('es-CL');
+    }
+    updateTime();
+    setInterval(updateTime, 1000);
+</script>
+{% endblock %}

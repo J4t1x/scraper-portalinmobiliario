@@ -1,0 +1,103 @@
+/* Custom styles for Portal Inmobiliario Scraper Dashboard */
+
+body {
+    padding-top: 4rem;
+}
+
+main {
+    min-height: calc(100vh - 4rem);
+}
+
+/* Scrollbar personalizado */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Animaciones suaves */
+.transition-all {
+    transition: all 0.3s ease;
+}
+
+/* Loading spinner */
+.spinner {
+    border: 3px solid #f3f4f6;
+    border-top: 3px solid #2563eb;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* DataTables custom styling */
+.dataTables_wrapper {
+    padding: 1rem 0;
+}
+
+table.dataTable thead th {
+    background-color: #f8fafc;
+    font-weight: 600;
+    color: #334155;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+table.dataTable tbody tr:hover {
+    background-color: #f1f5f9;
+}
+
+/* Chart containers */
+.chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+
+/* Terminal-style logs */
+.terminal {
+    background-color: #1e293b;
+    color: #e2e8f0;
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.terminal .log-line {
+    margin-bottom: 0.25rem;
+}
+
+.terminal .log-info {
+    color: #60a5fa;
+}
+
+.terminal .log-success {
+    color: #34d399;
+}
+
+.terminal .log-warning {
+    color: #fbbf24;
+}
+
+.terminal .log-error {
+    color: #f87171;
+}

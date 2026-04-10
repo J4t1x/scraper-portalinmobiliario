@@ -4,9 +4,9 @@ Utilidades para el scraper
 
 import json
 from typing import List, Dict
-import logging
+from logger_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def load_properties_from_txt(filepath: str) -> List[Dict[str, str]]:

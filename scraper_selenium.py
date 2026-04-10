@@ -1,5 +1,4 @@
 import time
-import logging
 from typing import List, Dict, Optional
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -10,18 +9,16 @@ from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 from config import Config
+from validator import DataValidator, validate_properties_batch
+from logger_config import get_logger, log_performance
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class PortalInmobiliarioSeleniumScraper:
     """Scraper usando Selenium para manejar JavaScript"""
     
-    def __init__(self, operacion: str, tipo_propiedad: str, headless: bool = True):
+    def __init__(self, operacion: str, tipo_propiedad: str, headless: bool = True, validate: bool = True, persist_to_db: bool = False):
         """
         Inicializa el scraper con Selenium
         
@@ -29,6 +26,8 @@ class PortalInmobiliarioSeleniumScraper:
             operacion: Tipo de operación
             tipo_propiedad: Tipo de propiedad
             headless: Ejecutar sin interfaz gráfica
+            validate: Si es True, valida las propiedades antes de agregarlas
+            persist_to_db: Si es True, persiste propiedades en PostgreSQL
         """
         if operacion not in Config.OPERACIONES:
             raise ValueError(f"Operación '{operacion}' no válida")
@@ -39,6 +38,10 @@ class PortalInmobiliarioSeleniumScraper:
         self.operacion = operacion
         self.tipo_propiedad = tipo_propiedad
         self.propiedades = []
+        self.validate = validate
+        self.validator = DataValidator() if validate else None
+        self.validation_stats = {'valid': 0, 'invalid': 0, 'warnings': 0}
+        self.persist_to_db = persist_to_db
         
         chrome_options = Options()
         if headless:
@@ -229,9 +232,19 @@ class PortalInmobiliarioSeleniumScraper:
         except:
             return False
     
-    def scrape_all_pages(self, max_pages: Optional[int] = None) -> List[Dict[str, str]]:
-        """Scrapea todas las páginas"""
+    def scrape_all_pages(self, max_pages: Optional[int] = None, scrape_details: bool = False, 
+                         max_detail_properties: Optional[int] = None) -> List[Dict[str, any]]:
+        """
+        Scrapea todas las páginas
+        
+        Args:
+            max_pages: Máximo de páginas a scrapear
+            scrape_details: Si es True, scrapea también la página de detalle de cada propiedad
+            max_detail_properties: Máximo de propiedades para las cuales scrapear detalle (para testing)
+        """
         logger.info(f"Iniciando scraping: {self.operacion} / {self.tipo_propiedad}")
+        if scrape_details:
+            logger.info("Modo detalle activado: se scrapeará información adicional de cada propiedad")
         
         offset = 0
         page_count = 0
@@ -255,10 +268,44 @@ class PortalInmobiliarioSeleniumScraper:
                     logger.info("No se encontraron más propiedades")
                     break
                 
-                self.propiedades.extend(properties)
+                # Si scrape_details está activado, obtener detalle de cada propiedad
+                if scrape_details:
+                    detailed_properties = []
+                    for i, prop in enumerate(properties):
+                        if max_detail_properties and i >= max_detail_properties:
+                            logger.info(f"Alcanzado límite de {max_detail_properties} propiedades con detalle")
+                            break
+                        
+                        try:
+                            property_id = prop.get('id', 'N/A')
+                            property_url = prop.get('url', '')
+                            
+                            if property_url and property_id != 'N/A':
+                                # Scrapear detalle
+                                detail_data = self.scrape_property_detail(property_id, property_url)
+                                
+                                # Mergear datos básicos con datos de detalle
+                                prop.update(detail_data)
+                                
+                                # Rate limiting
+                                time.sleep(2)
+                            
+                            detailed_properties.append(prop)
+                            
+                        except Exception as e:
+                            logger.error(f"Error obteniendo detalle para propiedad {i+1}: {e}")
+                            detailed_properties.append(prop)  # Agregar datos básicos de todos modos
+                            continue
+                    
+                    validated_props = self._validate_and_add_properties(detailed_properties)
+                    logger.info(f"Validadas {len(validated_props)}/{len(detailed_properties)} propiedades con detalle")
+                else:
+                    validated_props = self._validate_and_add_properties(properties)
+                    logger.info(f"Validadas {len(validated_props)}/{len(properties)} propiedades")
+                
                 page_count += 1
                 
-                logger.info(f"Página {page_count}: {len(properties)} propiedades | Total: {len(self.propiedades)}")
+                logger.info(f"Página {page_count}: {len(properties)} propiedades | Total válidas: {len(self.propiedades)}")
                 
                 if not self.has_next_page():
                     logger.info("No hay más páginas")
@@ -267,18 +314,334 @@ class PortalInmobiliarioSeleniumScraper:
                 offset += Config.ITEMS_PER_PAGE
                 time.sleep(Config.DELAY_BETWEEN_REQUESTS)
             
-            logger.info(f"Scraping completado: {len(self.propiedades)} propiedades en {page_count} páginas")
+            logger.info(f"Scraping completado: {len(self.propiedades)} propiedades válidas en {page_count} páginas")
+            if self.validate:
+                logger.info(f"Estadísticas de validación: {self.validation_stats['valid']} válidas, "
+                          f"{self.validation_stats['invalid']} inválidas, "
+                          f"{self.validation_stats['warnings']} con advertencias")
+            
+            # Persist to database if enabled
+            if self.persist_to_db and self.propiedades:
+                try:
+                    from scraper_db_integration import persist_properties
+                    logger.info("Persistiendo propiedades en PostgreSQL...")
+                    db_stats = persist_properties(self.propiedades)
+                    logger.info(f"Persistencia completada: {db_stats}")
+                except ImportError:
+                    logger.error("No se pudo importar scraper_db_integration. Asegúrate de que las dependencias estén instaladas.")
+                except Exception as e:
+                    logger.error(f"Error persistiendo a base de datos: {e}")
             
         finally:
             self.close()
         
         return self.propiedades
     
+    def scrape_property_detail(self, property_id: str, property_url: str) -> Dict[str, any]:
+        """
+        Scrapea la página de detalle de una propiedad.
+        
+        Args:
+            property_id: ID de la propiedad (ej: "MLC-3705621748")
+            property_url: URL completa de la propiedad
+            
+        Returns:
+            dict con datos detallados o dict vacío si falla
+        """
+        detail_data = {
+            'descripcion': None,
+            'caracteristicas': {},
+            'publicador': {},
+            'imagenes': [],
+            'coordenadas': {},
+            'fecha_publicacion': None
+        }
+        
+        try:
+            logger.info(f"Scrapeando detalle de propiedad {property_id}...")
+            
+            # Navegar a URL de detalle
+            self.driver.get(property_url)
+            time.sleep(3)  # Esperar carga inicial
+            
+            # Esperar a que cargue el contenido principal
+            try:
+                self.wait.until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, 
+                        'div.ui-pdp-container__content, div.ui-pdp-header, h1.ui-pdp-title'))
+                )
+                logger.info(f"Página de detalle cargada para {property_id}")
+            except Exception as e:
+                logger.warning(f"Timeout esperando contenido de detalle para {property_id}: {e}")
+            
+            page_source = self.driver.page_source
+            soup = BeautifulSoup(page_source, 'lxml')
+            
+            # Extraer descripción completa
+            try:
+                desc_elem = soup.select_one('div.ui-pdp-description__content, div.ui-pdp-description, p[data-testid="description"]')
+                if desc_elem:
+                    detail_data['descripcion'] = desc_elem.get_text(strip=True)
+                    logger.debug(f"Descripción extraída: {len(detail_data['descripcion'])} chars")
+            except Exception as e:
+                logger.debug(f"Error extrayendo descripción: {e}")
+            
+            # Extraer características detalladas
+            try:
+                # Buscar tabla de características o lista de atributos
+                caracteristicas = {}
+                
+                # Selectores comunes para características
+                attr_selectors = [
+                    'div.ui-vip-specs__table table tr',
+                    'div.ui-pdp-specs__table table tr',
+                    'div.ui-pdp-specs__list dl',
+                    '.andes-table__body .andes-table__row',
+                    'div[data-testid="specs-list"] .andes-list__item'
+                ]
+                
+                for selector in attr_selectors:
+                    rows = soup.select(selector)
+                    if rows:
+                        for row in rows:
+                            try:
+                                # Intentar diferentes estructuras
+                                key_elem = row.select_one('th, dt, .andes-table__header, .andes-list__item-primary')
+                                value_elem = row.select_one('td, dd, .andes-table__column, .andes-list__item-secondary')
+                                
+                                if key_elem and value_elem:
+                                    key = key_elem.get_text(strip=True).lower()
+                                    value = value_elem.get_text(strip=True)
+                                    
+                                    # Mapear campos conocidos
+                                    if any(x in key for x in ['orientación', 'orientacion']):
+                                        caracteristicas['orientacion'] = value
+                                    elif any(x in key for x in ['año', 'construcción', 'construccion']):
+                                        # Extraer número del año
+                                        import re
+                                        year_match = re.search(r'\d{4}', value)
+                                        if year_match:
+                                            caracteristicas['año_construccion'] = int(year_match.group())
+                                    elif any(x in key for x in ['gastos comunes', 'gasto común']):
+                                        # Extraer número de gastos
+                                        import re
+                                        gasto_match = re.search(r'[\d.,]+', value.replace('.', '').replace(',', ''))
+                                        if gasto_match:
+                                            try:
+                                                caracteristicas['gastos_comunes'] = int(gasto_match.group().replace('.', ''))
+                                            except:
+                                                pass
+                                    elif any(x in key for x in ['estacionamiento', 'estacionamientos']):
+                                        import re
+                                        est_match = re.search(r'\d+', value)
+                                        if est_match:
+                                            caracteristicas['estacionamientos'] = int(est_match.group())
+                                    elif any(x in key for x in ['bodega', 'bodegas']):
+                                        import re
+                                        bod_match = re.search(r'\d+', value)
+                                        if bod_match:
+                                            caracteristicas['bodegas'] = int(bod_match.group())
+                            except:
+                                continue
+                        break  # Si encontramos datos, salir del loop de selectores
+                
+                detail_data['caracteristicas'] = caracteristicas
+                logger.debug(f"Características extraídas: {len(caracteristicas)} items")
+            except Exception as e:
+                logger.debug(f"Error extrayendo características: {e}")
+            
+            # Extraer información del publicador
+            try:
+                publicador = {}
+                
+                # Buscar nombre del publicador
+                pub_name_elem = soup.select_one('div.ui-pdp-seller__header__title, .ui-seller-data__name, [data-testid="seller-name"]')
+                if pub_name_elem:
+                    publicador['nombre'] = pub_name_elem.get_text(strip=True)
+                
+                # Determinar tipo (inmobiliaria vs particular)
+                pub_type_elem = soup.select_one('div.ui-pdp-seller__header__label, .ui-seller-data__label, [data-testid="seller-type"]')
+                if pub_type_elem:
+                    tipo_text = pub_type_elem.get_text(strip=True).lower()
+                    if any(x in tipo_text for x in ['inmobiliaria', 'agente', 'corredor']):
+                        publicador['tipo'] = 'inmobiliaria'
+                    else:
+                        publicador['tipo'] = 'particular'
+                else:
+                    # Fallback: si no hay label específico, inferir por nombre
+                    if publicador.get('nombre'):
+                        nombre_lower = publicador['nombre'].lower()
+                        if any(x in nombre_lower for x in ['inmobiliaria', 'propiedades', 'bienes raíces', 'asesor']):
+                            publicador['tipo'] = 'inmobiliaria'
+                        else:
+                            publicador['tipo'] = 'particular'
+                
+                detail_data['publicador'] = publicador
+                logger.debug(f"Publicador extraído: {publicador.get('nombre', 'N/A')}")
+            except Exception as e:
+                logger.debug(f"Error extrayendo publicador: {e}")
+            
+            # Extraer URLs de imágenes
+            try:
+                imagenes = []
+                
+                # Buscar galería de imágenes
+                img_selectors = [
+                    'div.ui-pdp-gallery__column img',
+                    'div.ui-pdp-gallery img',
+                    'figure.ui-pdp-gallery__figure img',
+                    'img[data-testid="gallery-image"]'
+                ]
+                
+                for selector in img_selectors:
+                    img_elements = soup.select(selector)
+                    if img_elements:
+                        for img in img_elements:
+                            # Intentar obtener URL de alta resolución
+                            src = img.get('data-src') or img.get('data-full-src') or img.get('src')
+                            if src and src not in imagenes:
+                                # Limpiar URL para obtener versión grande
+                                src = src.replace('/D_NQ_NP_', '/D_NQ_NP_2X_')
+                                imagenes.append(src)
+                        
+                        if imagenes:
+                            break
+                
+                detail_data['imagenes'] = imagenes[:10]  # Limitar a 10 imágenes
+                logger.debug(f"Imágenes extraídas: {len(imagenes)}")
+            except Exception as e:
+                logger.debug(f"Error extrayendo imágenes: {e}")
+            
+            # Extraer coordenadas GPS
+            try:
+                coordenadas = {}
+                
+                # Buscar en scripts (datos de mapa)
+                scripts = soup.find_all('script')
+                for script in scripts:
+                    script_text = script.string if script else ''
+                    if script_text and ('latitude' in script_text or 'longitude' in script_text):
+                        import re
+                        # Buscar coordenadas en formato JSON o variables
+                        lat_match = re.search(r'["\']latitude["\']\s*:\s*(-?\d+\.?\d*)', script_text)
+                        lng_match = re.search(r'["\']longitude["\']\s*:\s*(-?\d+\.?\d*)', script_text)
+                        
+                        if lat_match and lng_match:
+                            coordenadas['lat'] = float(lat_match.group(1))
+                            coordenadas['lng'] = float(lng_match.group(1))
+                            break
+                
+                # Alternativa: buscar en meta tags o elementos de mapa
+                if not coordenadas:
+                    map_elem = soup.select_one('div.ui-pdp-map, [data-testid="map-container"]')
+                    if map_elem:
+                        data_coords = map_elem.get('data-coordinates') or map_elem.get('data-latlng')
+                        if data_coords:
+                            import re
+                            coords = re.findall(r'-?\d+\.?\d*', data_coords)
+                            if len(coords) >= 2:
+                                coordenadas['lat'] = float(coords[0])
+                                coordenadas['lng'] = float(coords[1])
+                
+                if coordenadas:
+                    detail_data['coordenadas'] = coordenadas
+                    logger.debug(f"Coordenadas extraídas: {coordenadas}")
+            except Exception as e:
+                logger.debug(f"Error extrayendo coordenadas: {e}")
+            
+            # Extraer fecha de publicación
+            try:
+                fecha_elem = soup.select_one('div.ui-pdp-header__bottom-line span, .ui-pdp-date, [data-testid="publication-date"]')
+                if fecha_elem:
+                    fecha_text = fecha_elem.get_text(strip=True).lower()
+                    # Parsear formatos comunes: "Publicado hace X días", "15 de marzo de 2024"
+                    import re
+                    from datetime import datetime, timedelta
+                    
+                    if 'hace' in fecha_text:
+                        # "Publicado hace 5 días"
+                        num_match = re.search(r'(\d+)', fecha_text)
+                        if num_match:
+                            dias = int(num_match.group(1))
+                            fecha = datetime.now() - timedelta(days=dias)
+                            detail_data['fecha_publicacion'] = fecha.strftime('%Y-%m-%d')
+                    else:
+                        # Intentar parsear fecha directa
+                        meses_es = {
+                            'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4,
+                            'mayo': 5, 'junio': 6, 'julio': 7, 'agosto': 8,
+                            'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12
+                        }
+                        
+                        # Buscar patrón: "15 de marzo de 2024"
+                        fecha_match = re.search(r'(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})', fecha_text)
+                        if fecha_match:
+                            dia = int(fecha_match.group(1))
+                            mes = meses_es.get(fecha_match.group(2).lower(), 0)
+                            anio = int(fecha_match.group(3))
+                            if mes > 0:
+                                fecha = datetime(anio, mes, dia)
+                                detail_data['fecha_publicacion'] = fecha.strftime('%Y-%m-%d')
+            except Exception as e:
+                logger.debug(f"Error extrayendo fecha: {e}")
+            
+            logger.info(f"Detalle scrapeado exitosamente para {property_id}")
+            
+        except Exception as e:
+            logger.error(f"Error scrapeando detalle de {property_id}: {e}")
+            # Retornar datos parciales si los hay, o vacío
+        
+        return detail_data
+    
     def close(self):
         """Cierra el navegador"""
         if self.driver:
             logger.info("Cerrando navegador...")
             self.driver.quit()
+    
+    def _validate_and_add_properties(self, properties: List[Dict]) -> List[Dict]:
+        """
+        Valida y agrega propiedades a la lista interna.
+        
+        Si validate=True, usa DataValidator para validar cada propiedad.
+        Solo las propiedades válidas se agregan a self.propiedades.
+        
+        Args:
+            properties: Lista de propiedades a validar y agregar
+            
+        Returns:
+            Lista de propiedades que fueron agregadas (válidas)
+        """
+        if not self.validate or not self.validator:
+            # Sin validación, agregar todas
+            self.propiedades.extend(properties)
+            return properties
+        
+        valid_properties = []
+        
+        for prop in properties:
+            try:
+                result = self.validator.validate_property(prop)
+                
+                if result.is_valid:
+                    self.propiedades.append(result.property_data)
+                    valid_properties.append(result.property_data)
+                    self.validation_stats['valid'] += 1
+                    
+                    if result.warnings:
+                        self.validation_stats['warnings'] += len(result.warnings)
+                        logger.debug(f"Propiedad {prop.get('id', 'N/A')} válida con {len(result.warnings)} advertencias")
+                else:
+                    self.validation_stats['invalid'] += 1
+                    logger.warning(f"Propiedad inválida descartada: {result.errors}")
+                    
+            except Exception as e:
+                logger.error(f"Error validando propiedad {prop.get('id', 'N/A')}: {e}")
+                # En caso de error en validación, agregar de todos modos (no bloquear)
+                self.propiedades.append(prop)
+                valid_properties.append(prop)
+        
+        return valid_properties
     
     def get_properties(self) -> List[Dict[str, str]]:
         """Retorna las propiedades scrapeadas"""
