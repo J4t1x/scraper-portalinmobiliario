@@ -73,6 +73,11 @@
 - [x] Interfaz Flask básica
 - [x] Autenticación (Admin/Viewer)
 - [x] **Lectura de archivos JSON desde output/** (data_loader.py)
+- [x] **API REST endpoints para lectura de JSON** (SPEC-MVP-002)
+  - GET /api/properties (filtros, paginación)
+  - GET /api/properties/<id>
+  - GET /api/stats
+  - GET /api/filters
 - [ ] **Visualización de propiedades (tabla interactiva)**
 - [ ] **Filtros básicos (operación, tipo, precio)**
 - [ ] **Vista de detalle de propiedad**
@@ -227,6 +232,15 @@
 ## 📝 Notas
 
 ### Cambios Recientes
+- **2026-04-09:** Completado SPEC-MVP-002 - Dashboard API (endpoints JSON)
+  - Actualizado `dashboard/routes.py` para usar JSONDataLoader
+  - 4 endpoints RESTful implementados:
+    - GET /api/properties (filtros: operacion, tipo, precio, search; paginación)
+    - GET /api/properties/<id> (detalle de propiedad)
+    - GET /api/stats (estadísticas generales)
+    - GET /api/filters (valores únicos de filtros)
+  - Manejo de errores robusto con logging
+  - Tests de integración: 16 tests, 100% pass rate
 - **2026-04-09:** Completado SPEC-MVP-001 - Data Loader (lectura de JSON)
   - Módulo `data_loader.py` implementado con JSONDataLoader
   - Carga de archivos JSON desde carpeta output/

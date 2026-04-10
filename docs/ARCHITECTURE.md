@@ -257,6 +257,23 @@ def get_executions(job_id, limit) -> List[Dict]
 - Visualización de datos
 - Logs en tiempo real (WebSocket)
 
+### 10. Dashboard API (`dashboard/routes.py`)
+
+**Responsabilidades:**
+- **Fuente de datos MVP:** JSONDataLoader (archivos en `output/`)
+- **Endpoints RESTful:**
+  - `GET /api/properties` - Listar propiedades con filtros y paginación
+    - Query params: `operacion`, `tipo`, `precio_min`, `precio_max`, `search`, `page`, `per_page`
+    - Respuesta: `{success, data, pagination}`
+  - `GET /api/properties/<id>` - Detalle de propiedad específica
+    - Respuesta: `{success, data}` o 404 si no existe
+  - `GET /api/stats` - Estadísticas generales
+    - Respuesta: `{success, data: {total, by_operacion, by_tipo, files_loaded}}`
+  - `GET /api/filters` - Valores únicos para filtros
+    - Respuesta: `{success, data: {operaciones, tipos, comunas}}`
+- **Autenticación:** Requiere `@login_required` en todos los endpoints
+- **Manejo de errores:** Try-catch con logging detallado
+
 ---
 
 ## Flujo de Datos
