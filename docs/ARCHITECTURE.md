@@ -254,8 +254,18 @@ def get_executions(job_id, limit) -> List[Dict]
 - Interfaz web con Flask
 - Autenticación (Admin/Viewer)
 - Control del scraper desde UI
-- Visualización de datos
-- Logs en tiempo real (WebSocket)
+- Visualización de datos con Chart.js
+- Logs en tiempo real (WebSocket) - Post-MVP
+
+**Templates (MVP):**
+- `dashboard/index.html` - Dashboard principal con KPIs y gráficos
+- `dashboard/data.html` - Explorador de datos con tabla y filtros
+- `dashboard/property_detail.html` - Vista de detalle standalone
+- `auth/login.html` - Página de login
+
+**JavaScript (MVP):**
+- `static/js/dashboard.js` - Chart.js integration para gráficos
+- `static/js/data-explorer.js` - Funcionalidad de tabla y filtros
 
 ### 10. Dashboard API (`dashboard/routes.py`)
 

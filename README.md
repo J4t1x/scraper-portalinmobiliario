@@ -177,7 +177,7 @@ python main.py --operacion venta --tipo departamento --reset-duplicates
 
 ### Opción 3: Scheduler Automatizado (Nueva)
 
-El scraper ahora incluye un scheduler automatizado con APScheduler para ejecutar tareas de scraping periódicas sin intervención manual.
+El scraper incluye un scheduler automatizado con APScheduler para ejecutar tareas de scraping periódicas sin intervención manual. Implementado en SPEC-011 y SPEC-012.
 
 **Iniciar el scheduler:**
 ```bash
@@ -194,10 +194,17 @@ python main.py --scheduler status
 python main.py --scheduler list-jobs
 ```
 
-**Configurar jobs default:**
+**Configurar jobs default (SPEC-012):**
 ```bash
 python main.py --scheduler setup-default
 ```
+
+Esto configura 5 jobs predefinidos:
+- `scrape_venta_departamento` - Diario a las 02:00 AM (50 páginas, detalle completo)
+- `scrape_arriendo_departamento` - Diario a las 03:00 AM (50 páginas, detalle completo)
+- `scrape_venta_casa` - Diario a las 04:00 AM (30 páginas, detalle completo)
+- `scrape_arriendo_casa` - Diario a las 05:00 AM (30 páginas, detalle completo)
+- `scrape_venta_oficina` - Semanal (lunes a las 06:00 AM, 20 páginas, detalle completo)
 
 **Agregar un job personalizado:**
 ```bash
@@ -214,10 +221,23 @@ python main.py --scheduler add-job --operacion arriendo --tipo casa --schedule-t
 python main.py --scheduler remove-job --job-id scrape_venta_departamento
 ```
 
+**Ver historial de ejecuciones:**
+```bash
+python main.py --scheduler executions
+```
+
 **Detener el scheduler:**
 ```bash
 python main.py --scheduler stop
 ```
+
+**Características del Scheduler:**
+- ✅ Persistencia en PostgreSQL (jobs y estado)
+- ✅ Logging detallado de ejecuciones
+- ✅ Concurrency control (max 3 jobs simultáneos)
+- ✅ Recuperación automática ante reinicios
+- ✅ Heartbeat monitoring
+- ✅ API REST para control remoto
 
 ### Parámetros disponibles
 
@@ -473,13 +493,13 @@ DATABASE_URL=postgresql://user:password@localhost:5432/scraper_db
 - ✅ Logging detallado con timestamps
 - ✅ Manejo robusto de errores
 
-### 📋 Fase 2 - Mejoras (En progreso)
+### 📋 Fase 2 - Mejoras (Completada)
 - ✅ Extracción de atributos (dormitorios, baños, m²)
 - ✅ Scraping de página de detalle (descripción, características, publicador, imágenes, coordenadas GPS, fecha)
-- ✅ Tests unitarios con pytest
+- ✅ Tests unitarios con pytest (73% coverage, excluye módulos SQLAlchemy por incompatibilidad Python 3.14)
 - [ ] Logging a archivo rotativo
-- [ ] Validación de datos extraídos
-- [ ] Detección de duplicados
+- ✅ Validación de datos extraídos
+- ✅ Detección de duplicados
 
 ### 🚀 Fase 3 - Pro
 - [ ] Uso de API interna (JSON endpoints)

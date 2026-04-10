@@ -269,7 +269,7 @@ class TestScrapeAllPagesIntegration:
         <html>
             <body>
                 <li class="ui-search-layout__item">
-                    <a class="poly-component__title" href="https://example.com/MLC-123">Propiedad 1</a>
+                    <a class="poly-component__title" href="https://example.com/MLC-12345678">Propiedad 1</a>
                     <span class="andes-money-amount__fraction">1000</span>
                 </li>
             </body>
@@ -296,7 +296,7 @@ class TestScrapeAllPagesIntegration:
         <html>
             <body>
                 <li class="ui-search-layout__item">
-                    <a class="poly-component__title" href="https://example.com/MLC-123">Propiedad 1</a>
+                    <a class="poly-component__title" href="https://example.com/MLC-12345678">Propiedad 1</a>
                     <span class="andes-money-amount__fraction">1000</span>
                 </li>
             </body>
@@ -377,7 +377,7 @@ class TestDataExporterFlatten:
         result = exporter.flatten_property(prop)
         
         assert result['id'] == 'MLC-123'
-        assert result['imagenes'] == 'url1.jpg, url2.jpg, url3.jpg'
+        assert result['imagenes'] == 'url1.jpg | url2.jpg | url3.jpg'
     
     def test_flatten_none_values(self, exporter):
         """Test manejo de valores None"""
@@ -425,7 +425,7 @@ class TestDataExporterFlatten:
         assert result['caracteristicas_año_construccion'] == '2024'
         assert result['publicador_nombre'] == 'Inmobiliaria XYZ'
         assert result['publicador_tipo'] == 'inmobiliaria'
-        assert result['imagenes'] == 'https://img1.jpg, https://img2.jpg'
+        assert result['imagenes'] == 'https://img1.jpg | https://img2.jpg'
         assert result['coordenadas_lat'] == '-33.4569'
         assert result['coordenadas_lng'] == '-70.6483'
 

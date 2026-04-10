@@ -42,6 +42,18 @@ class BaseRepository(Generic[T]):
         """
         return self._session.get(self._model, id)
     
+    def get(self, id: int) -> Optional[T]:
+        """
+        Alias for get_by_id() for convenience.
+        
+        Args:
+            id: Primary key value
+            
+        Returns:
+            Entity instance or None if not found
+        """
+        return self.get_by_id(id)
+    
     def get_all(
         self, 
         skip: int = 0, 

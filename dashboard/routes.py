@@ -76,6 +76,27 @@ def analytics():
     """Analytics avanzado"""
     return render_template('dashboard/analytics.html', user=current_user)
 
+@bp.route('/property/<property_id>')
+@login_required
+def property_detail(property_id):
+    """Página de detalle de propiedad"""
+    try:
+        loader = JSONDataLoader()
+        properties = loader.load_all_json_files()
+        
+        # Buscar por ID
+        prop = next((p for p in properties if p.get('id') == property_id), None)
+        
+        if not prop:
+            flash('Propiedad no encontrada', 'error')
+            return redirect(url_for('main.data'))
+        
+        return render_template('dashboard/property_detail.html', user=current_user, property=prop)
+    except Exception as e:
+        logger.error(f"Error en property_detail: {e}")
+        flash('Error cargando detalle de propiedad', 'error')
+        return redirect(url_for('main.data'))
+
 @bp.route('/api/properties')
 @login_required
 def api_properties():

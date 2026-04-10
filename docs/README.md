@@ -1,6 +1,6 @@
 # 📚 Documentación — Portal Inmobiliario Scraper
 
-**Última actualización:** Abril 2026
+**Última actualización:** 9 Abril 2026
 
 ---
 
@@ -11,6 +11,7 @@
 - [**STATUS**](STATUS.md) — Estado actual del proyecto
 - [**CONVENTIONS**](CONVENTIONS.md) — Convenciones de código
 - [**ORGANIZATION**](ORGANIZATION.md) — Organización de la documentación
+- [**LOGGING**](LOGGING.md) — Sistema de logging
 
 ### 📖 Guías
 - [**QUICKSTART**](guides/QUICKSTART.md) — Guía de inicio rápido (5 minutos)
@@ -23,6 +24,33 @@
 ### � Especificaciones
 - [**PRD**](specs/prd.md) — Product Requirements Document
 - [**Roadmap Completo**](ROADMAP-COMPLETO.md) — Roadmap detallado del proyecto
+
+### 🔄 Migración
+- [**Migration Guide**](migration/MIGRATION-GUIDE.md) — Guía de migración a PostgreSQL
+- [**Deployment Summary**](deployment/DEPLOYMENT-SUMMARY.md) — Resumen de deployment
+
+---
+
+## 📰 Cambios Recientes
+
+### 9 Abril 2026 - Scheduler Automatizado (SPEC-011 y SPEC-012)
+- ✅ Completado SPEC-011: Scheduler con APScheduler
+  - Job store PostgreSQL para persistencia
+  - Concurrency control (max 3 jobs simultáneos)
+  - Event listeners para tracking en tiempo real
+  - Heartbeat monitoring y recuperación automática
+  - API REST para control remoto (16 endpoints)
+- ✅ Completado SPEC-012: Jobs de scraping automático
+  - 5 jobs preconfigurados (venta/arriendo departamento/casa/oficina)
+  - Schedules: diario (02:00-05:00 AM) y semanal (lunes 06:00 AM)
+  - Integración con PostgreSQL para logging de ejecuciones
+  - CLI commands: `--scheduler start/stop/status/list-jobs/add-job/remove-job`
+- 📄 Actualizada documentación: STATUS.md, README.md, ARCHITECTURE.md
+
+### 7 Abril 2026 - Scraping de Detalle
+- ✅ Implementado scraping de página de detalle completo
+- ✅ Extracción de 15+ campos adicionales (descripción, características, publicador, imágenes, coordenadas GPS, fecha)
+- ✅ Integración en exportación (JSON, CSV)
 
 ---
 

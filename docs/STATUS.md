@@ -14,7 +14,7 @@
 | **PostgreSQL** | ⏳ Pendiente | Post-MVP (validación exitosa) |
 | **Cobertura de tests** | ✅ Completada | 73% (Python 3.14: excluye módulos SQLAlchemy por incompatibilidad) |
 | **Documentación** | 🔄 Actualizando | README + docs/ |
-| **Specs completadas** | 11/39 (28%) | Fase MVP: Dashboard con JSON |
+| **Specs completadas** | 12/39 (31%) | Fase MVP: Dashboard con JSON |
 
 ---
 
@@ -78,12 +78,12 @@
   - GET /api/properties/<id>
   - GET /api/stats
   - GET /api/filters
-- [ ] **Visualización de propiedades (tabla interactiva)**
-- [ ] **Filtros básicos (operación, tipo, precio)**
-- [ ] **Vista de detalle de propiedad**
-- [ ] **KPIs básicos (total, por tipo, por operación)**
-- [ ] **Gráficos simples (Chart.js)**
-- [ ] **Búsqueda por texto**
+- [x] **Visualización de propiedades (tabla interactiva)** (SPEC-MVP-003)
+- [x] **Filtros básicos (operación, tipo, precio, búsqueda)** (SPEC-MVP-003)
+- [x] **Vista de detalle de propiedad** (modal + página standalone) (SPEC-MVP-003)
+- [x] **KPIs básicos (total, por tipo, por operación, archivos)** (SPEC-MVP-003)
+- [x] **Gráficos simples (Chart.js)** - distribución por operación, tipo, top comunas (SPEC-MVP-003)
+- [x] **Búsqueda por texto** (SPEC-MVP-003)
 - [x] Control del scraper (CLI)
 - [ ] Logs en tiempo real (WebSocket) - Post-MVP
 - [ ] Analytics avanzado - Post-MVP
@@ -232,6 +232,18 @@
 ## 📝 Notas
 
 ### Cambios Recientes
+- **2026-04-09:** Completado SPEC-MVP-003 - Dashboard UI (Componentes de visualización)
+  - Actualizado `templates/dashboard/index.html` con KPIs dinámicos y gráficos Chart.js
+  - Implementado `static/js/dashboard.js` con integración completa de Chart.js
+    - Gráfico de distribución por operación (pie chart)
+    - Gráfico de distribución por tipo (bar chart)
+    - Gráfico de top 10 comunas (horizontal bar chart)
+    - Carga dinámica de estadísticas desde API /api/stats
+  - Creado `templates/dashboard/property_detail.html` (página standalone de detalle)
+  - Agregada ruta `/property/<id>` en `dashboard/routes.py`
+  - Actualizado `templates/dashboard/data.html` con link a página de detalle
+  - Responsive design con TailwindCSS
+  - Loading states y error handling en JavaScript
 - **2026-04-09:** Completado SPEC-MVP-002 - Dashboard API (endpoints JSON)
   - Actualizado `dashboard/routes.py` para usar JSONDataLoader
   - 4 endpoints RESTful implementados:

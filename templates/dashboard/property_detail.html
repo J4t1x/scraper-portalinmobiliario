@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+
+{% block title %}Detalle de Propiedad - Portal Inmobiliario Scraper{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <a href="{{ url_for('dashboard.data') }}" class="text-blue-600 hover:text-blue-800 flex items-center gap-2 mb-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                </svg>
+                Volver al Explorador
+            </a>
+            <h1 class="text-3xl font-bold text-slate-900">{{ property.titulo or 'Sin título' }}</h1>
+        </div>
+        <a href="{{ property.url }}" target="_blank" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center gap-2">
+            Ver en Portal Inmobiliario
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+            </svg>
+        </a>
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left Column - Property Info -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Price and Basic Info -->
+            <div class="bg-white rounded-lg shadow p-6 border border-slate-200">
+                <div class="grid grid-cols-2 gap-6">
+                    <div>
+                        <h3 class="text-sm font-medium text-slate-600 mb-1">Precio</h3>
+                        <p class="text-3xl font-bold text-slate-900">{{ property.precio or 'N/A' }}</p>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-medium text-slate-600 mb-1">Operación</h3>
+                        <span class="px-3 py-1 inline-flex text-sm leading-5 font-semibold rounded-full {{ 'bg-green-100 text-green-800' if property.operacion == 'venta' else 'bg-blue-100 text-blue-800' }}">
+                            {{ property.operacion or 'N/A' }}
+                        </span>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-medium text-slate-600 mb-1">Tipo</h3>
+                        <p class="text-lg font-semibold text-slate-900">{{ property.tipo or 'N/A' }}</p>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-medium text-slate-600 mb-1">Comuna</h3>
+                        <p class="text-lg font-semibold text-slate-900">{{ property.comuna or 'N/A' }}</p>
+                    </div>
+                </div>
+
+                {% if property.direccion %}
+                <div class="mt-6 pt-6 border-t border-slate-200">
+                    <h3 class="text-sm font-medium text-slate-600 mb-2">Dirección</h3>
+                    <p class="text-slate-900">{{ property.direccion }}</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Description -->
+            {% if property.descripcion %}
+            <div class="bg-white rounded-lg shadow p-6 border border-slate-200">
+                <h2 class="text-lg font-semibold text-slate-900 mb-4">Descripción</h2>
+                <p class="text-slate-700 leading-relaxed whitespace-pre-line">{{ property.descripcion }}</p>
+            </div>
+            {% endif %}
+
+            <!-- Attributes -->
+            {% if property.atributos %}
+            <div class="bg-white rounded-lg shadow p-6 border border-slate-200">
+                <h2 class="text-lg font-semibold text-slate-900 mb-4">Atributos</h2>
+                <p class="text-slate-700">{{ property.atributos }}</p>
+            </div>
+            {% endif %}
+
+            <!-- Features -->
+            {% if property.caracteristicas %}
+            <div class="bg-white rounded-lg shadow p-6 border border-slate-200">
+                <h2 class="text-lg font-semibold text-slate-900 mb-4">Características</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    {% for key, value in property.caracteristicas.items() %}
+                    <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
+                        <span class="text-sm font-medium text-slate-600">{{ key }}</span>
+                        <span class="text-sm font-semibold text-slate-900">{{ value or 'N/A' }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Images -->
+            {% if property.imagenes and property.imagenes|length > 0 %}
+            <div class="bg-white rounded-lg shadow p-6 border border-slate-200">
+                <h2 class="text-lg font-semibold text-slate-900 mb-4">Imágenes</h2>
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {% for img_url in property.imagenes[:6] %}
+                    <div class="aspect-video bg-slate-100 rounded-lg overflow-hidden">
+                        <img src="{{ img_url }}" alt="Imagen de propiedad" class="w-full h-full object-cover hover:scale-105 transition-transform cursor-pointer" onclick="window.open('{{ img_url }}', '_blank')">
+                    </div>
+                    {% endfor %}
+                </div>
+                {% if property.imagenes|length > 6 %}
+                <p class="text-sm text-slate-500 mt-4">+ {{ property.imagenes|length - 6 }} imágenes adicionales</p>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Coordinates / Map -->
+            {% if property.coordenadas %}
+            <div class="bg-white rounded-lg shadow p-6 border border-slate-200">
+                <h2 class="text-lg font-semibold text-slate-900 mb-4">Ubicación</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <h3 class="text-sm font-medium text-slate-600 mb-1">Latitud</h3>
+                        <p class="text-slate-900">{{ property.coordenadas.lat }}</p>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-medium text-slate-600 mb-1">Longitud</h3>
+                        <p class="text-slate-900">{{ property.coordenadas.lng }}</p>
+                    </div>
+                </div>
+                <a href="https://www.google.com/maps?q={{ property.coordenadas.lat }},{{ property.coordenadas.lng }}" target="_blank" class="mt-4 inline-flex items-center gap-2 text-blue-600 hover:text-blue-800">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    Ver en Google Maps
+                </a>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Right Column - Sidebar Info -->
+        <div class="space-y-6">
+            <!-- Publisher Info -->
+            {% if property.publicador %}
+            <div class="bg-white rounded-lg shadow p-6 border border-slate-200">
+                <h2 class="text-lg font-semibold text-slate-900 mb-4">Publicador</h2>
+                <div class="space-y-3">
+                    <div>
+                        <h3 class="text-sm font-medium text-slate-600 mb-1">Nombre</h3>
+                        <p class="text-slate-900">{{ property.publicador.nombre or 'N/A' }}</p>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-medium text-slate-600 mb-1">Tipo</h3>
+                        <p class="text-slate-900">{{ property.publicador.tipo or 'N/A' }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Scraping Info -->
+            <div class="bg-white rounded-lg shadow p-6 border border-slate-200">
+                <h2 class="text-lg font-semibold text-slate-900 mb-4">Información de Scraping</h2>
+                <div class="space-y-3">
+                    <div>
+                        <h3 class="text-sm font-medium text-slate-600 mb-1">ID Portal</h3>
+                        <p class="text-slate-900 font-mono text-sm">{{ property.portal_id or property.id }}</p>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-medium text-slate-600 mb-1">Fecha de Publicación</h3>
+                        <p class="text-slate-900">{{ property.fecha_publicacion or 'N/A' }}</p>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-medium text-slate-600 mb-1">Scrapeado el</h3>
+                        <p class="text-slate-900">{{ property.scrapeado_en or 'N/A' }}</p>
+                    </div>
+                    {% if property._source_file %}
+                    <div>
+                        <h3 class="text-sm font-medium text-slate-600 mb-1">Archivo Fuente</h3>
+                        <p class="text-slate-900 text-sm">{{ property._source_file }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="bg-white rounded-lg shadow p-6 border border-slate-200">
+                <h2 class="text-lg font-semibold text-slate-900 mb-4">Acciones</h2>
+                <div class="space-y-2">
+                    <a href="{{ property.url }}" target="_blank" class="block w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-center">
+                        Ver en Portal Inmobiliario
+                    </a>
+                    <button onclick="window.print()" class="block w-full px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors">
+                        Imprimir Detalle
+                    </button>
+                    <a href="{{ url_for('dashboard.data') }}" class="block w-full px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-center">
+                        Volver al Explorador
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -8,12 +8,16 @@ and database utilities for the scraper.
 import logging
 from typing import Optional, Dict, Any
 from datetime import datetime
+from contextlib import contextmanager
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker, Session, declarative_base
 from sqlalchemy.exc import OperationalError, SQLAlchemyError, IntegrityError
 from config import Config
 
 logger = logging.getLogger(__name__)
+
+# Declarative Base for ORM models
+Base = declarative_base()
 
 # Global engine and session factory
 _engine: Optional = None
@@ -169,6 +173,30 @@ class DatabaseSession:
             self.session.commit()
         
         self.session.close()
+
+
+@contextmanager
+def session_scope():
+    """
+    Context manager for database sessions with automatic commit/rollback.
+    
+    Usage:
+        with session_scope() as session:
+            session.add(obj)
+            # Automatic commit on success, rollback on exception
+    
+    Yields:
+        SQLAlchemy Session
+    """
+    session = get_session()
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
 
 def upsert_property(session: Session, property_data: Dict[str, Any]) -> 'Property':

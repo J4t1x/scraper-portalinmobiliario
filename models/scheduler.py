@@ -26,7 +26,7 @@ class SchedulerExecution(Base):
         pages_processed: Number of pages processed
         error_message: Error message if failed
         duration: Duration in seconds
-        metadata: JSON with job parameters
+        job_metadata: JSON with job parameters
     """
     
     __tablename__ = 'scheduler_executions'
@@ -46,7 +46,7 @@ class SchedulerExecution(Base):
     error_message = Column(Text, nullable=True)
     duration = Column(Integer, nullable=True)  # Duration in seconds
     
-    metadata = Column(JSON, nullable=True)
+    job_metadata = Column(JSON, nullable=True)
     
     def __repr__(self) -> str:
         return f"<SchedulerExecution(id={self.id}, job_id='{self.job_id}', status='{self.status}')>"
@@ -64,7 +64,7 @@ class SchedulerExecution(Base):
             'pages_processed': self.pages_processed,
             'error_message': self.error_message,
             'duration': self.duration,
-            'metadata': self.metadata
+            'metadata': self.job_metadata
         }
 
 

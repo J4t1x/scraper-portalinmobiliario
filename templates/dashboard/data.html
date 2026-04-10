@@ -1,13 +1,477 @@
 {% extends "base.html" %}
 
-{% block title %}Datos - Portal Inmobiliario Scraper{% endblock %}
+{% block title %}Explorador de Datos - Portal Inmobiliario Scraper{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
-    <h1 class="text-3xl font-bold text-slate-900">Explorador de Datos</h1>
-    
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-slate-900">Explorador de Datos</h1>
+            <p class="text-slate-600 mt-1">Total de propiedades: <span id="total-count">{{ total }}</span></p>
+        </div>
+        <button onclick="refreshData()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+            <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+            Actualizar
+        </button>
+    </div>
+
+    <!-- Filtros -->
     <div class="bg-white rounded-lg shadow p-6 border border-slate-200">
-        <p class="text-slate-600">El explorador de datos se implementará en la Fase 2</p>
+        <h2 class="text-lg font-semibold text-slate-900 mb-4">Filtros</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Búsqueda -->
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">Búsqueda</label>
+                <input type="text" id="search" placeholder="Buscar por título..." 
+                    class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            </div>
+
+            <!-- Operación -->
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">Operación</label>
+                <select id="filter-operacion" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <option value="">Todas</option>
+                    <option value="venta">Venta</option>
+                    <option value="arriendo">Arriendo</option>
+                    <option value="arriendo-de-temporada">Arriendo Temporada</option>
+                </select>
+            </div>
+
+            <!-- Tipo -->
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">Tipo</label>
+                <select id="filter-tipo" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <option value="">Todos</option>
+                    <option value="departamento">Departamento</option>
+                    <option value="casa">Casa</option>
+                    <option value="oficina">Oficina</option>
+                    <option value="terreno">Terreno</option>
+                    <option value="local-comercial">Local Comercial</option>
+                </select>
+            </div>
+
+            <!-- Comuna -->
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">Comuna</label>
+                <input type="text" id="filter-comuna" placeholder="Ej: Santiago, Providencia..." 
+                    class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            </div>
+
+            <!-- Precio Mínimo -->
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">Precio Mínimo</label>
+                <input type="number" id="filter-precio-min" placeholder="0" 
+                    class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            </div>
+
+            <!-- Precio Máximo -->
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">Precio Máximo</label>
+                <input type="number" id="filter-precio-max" placeholder="999999999" 
+                    class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            </div>
+
+            <!-- Botones -->
+            <div class="flex items-end gap-2">
+                <button onclick="applyFilters()" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                    Filtrar
+                </button>
+                <button onclick="clearFilters()" class="flex-1 px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors">
+                    Limpiar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de Propiedades -->
+    <div class="bg-white rounded-lg shadow border border-slate-200 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200">
+                <thead class="bg-slate-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">ID</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Título</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Precio</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Operación</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Tipo</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Comuna</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Scrapeado</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="properties-table" class="bg-white divide-y divide-slate-200">
+                    <tr>
+                        <td colspan="8" class="px-6 py-4 text-center text-slate-500">
+                            Cargando propiedades...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Paginación -->
+        <div class="bg-slate-50 px-6 py-4 flex items-center justify-between border-t border-slate-200">
+            <div class="flex-1 flex justify-between sm:hidden">
+                <button onclick="previousPage()" class="relative inline-flex items-center px-4 py-2 border border-slate-300 text-sm font-medium rounded-md text-slate-700 bg-white hover:bg-slate-50">
+                    Anterior
+                </button>
+                <button onclick="nextPage()" class="ml-3 relative inline-flex items-center px-4 py-2 border border-slate-300 text-sm font-medium rounded-md text-slate-700 bg-white hover:bg-slate-50">
+                    Siguiente
+                </button>
+            </div>
+            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                <div>
+                    <p class="text-sm text-slate-700">
+                        Mostrando <span id="showing-from">0</span> a <span id="showing-to">0</span> de <span id="showing-total">0</span> resultados
+                    </p>
+                </div>
+                <div>
+                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" id="pagination-controls">
+                        <!-- Pagination buttons will be inserted here -->
+                    </nav>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
+
+<!-- Modal de Detalle -->
+<div id="detail-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="p-6">
+            <div class="flex justify-between items-start mb-4">
+                <h2 class="text-2xl font-bold text-slate-900" id="modal-title">Detalle de Propiedad</h2>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div id="modal-content">
+                <!-- Content will be loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentPage = 1;
+let totalPages = 1;
+let currentFilters = {};
+
+// Cargar datos al iniciar
+document.addEventListener('DOMContentLoaded', function() {
+    loadProperties();
+    
+    // Búsqueda en tiempo real (con debounce)
+    let searchTimeout;
+    document.getElementById('search').addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            applyFilters();
+        }, 500);
+    });
+});
+
+function loadProperties(page = 1) {
+    currentPage = page;
+    
+    // Construir query string
+    const params = new URLSearchParams({
+        page: page,
+        per_page: 20,
+        ...currentFilters
+    });
+    
+    fetch(`/api/properties?${params}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                renderTable(data.data);
+                renderPagination(data.pagination);
+            } else {
+                showError('Error al cargar propiedades: ' + data.error);
+            }
+        })
+        .catch(error => {
+            showError('Error de conexión: ' + error.message);
+        });
+}
+
+function renderTable(properties) {
+    const tbody = document.getElementById('properties-table');
+    
+    if (properties.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="px-6 py-4 text-center text-slate-500">
+                    No se encontraron propiedades con los filtros seleccionados
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = properties.map(prop => `
+        <tr class="hover:bg-slate-50">
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900">${prop.portal_id || prop.id}</td>
+            <td class="px-6 py-4 text-sm text-slate-900">
+                <div class="max-w-xs truncate" title="${prop.titulo || 'Sin título'}">${prop.titulo || 'Sin título'}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                ${formatPrice(prop.precio, prop.precio_moneda)}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getOperacionClass(prop.operacion)}">
+                    ${prop.operacion || 'N/A'}
+                </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900">${prop.tipo || 'N/A'}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900">${prop.comuna || 'N/A'}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                ${formatDate(prop.scrapeado_en)}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                <a href="/property/${prop.id}" class="text-blue-600 hover:text-blue-900 mr-3">Ver</a>
+                <button onclick="viewDetail(${prop.id})" class="text-purple-600 hover:text-purple-900 mr-3">Modal</button>
+                <a href="${prop.url}" target="_blank" class="text-green-600 hover:text-green-900">Portal</a>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function renderPagination(pagination) {
+    totalPages = pagination.pages;
+    
+    document.getElementById('showing-from').textContent = (pagination.page - 1) * pagination.per_page + 1;
+    document.getElementById('showing-to').textContent = Math.min(pagination.page * pagination.per_page, pagination.total);
+    document.getElementById('showing-total').textContent = pagination.total;
+    document.getElementById('total-count').textContent = pagination.total;
+    
+    const controls = document.getElementById('pagination-controls');
+    let html = '';
+    
+    // Previous button
+    html += `
+        <button onclick="previousPage()" ${currentPage === 1 ? 'disabled' : ''} 
+            class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-slate-300 bg-white text-sm font-medium text-slate-500 hover:bg-slate-50 ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : ''}">
+            <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/>
+            </svg>
+        </button>
+    `;
+    
+    // Page numbers
+    const maxButtons = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+    let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+    
+    if (endPage - startPage < maxButtons - 1) {
+        startPage = Math.max(1, endPage - maxButtons + 1);
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+        html += `
+            <button onclick="loadProperties(${i})" 
+                class="relative inline-flex items-center px-4 py-2 border border-slate-300 text-sm font-medium ${i === currentPage ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 hover:bg-slate-50'}">
+                ${i}
+            </button>
+        `;
+    }
+    
+    // Next button
+    html += `
+        <button onclick="nextPage()" ${currentPage === totalPages ? 'disabled' : ''} 
+            class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-slate-300 bg-white text-sm font-medium text-slate-500 hover:bg-slate-50 ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : ''}">
+            <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+            </svg>
+        </button>
+    `;
+    
+    controls.innerHTML = html;
+}
+
+function applyFilters() {
+    currentFilters = {};
+    
+    const search = document.getElementById('search').value.trim();
+    if (search) currentFilters.search = search;
+    
+    const operacion = document.getElementById('filter-operacion').value;
+    if (operacion) currentFilters.operacion = operacion;
+    
+    const tipo = document.getElementById('filter-tipo').value;
+    if (tipo) currentFilters.tipo = tipo;
+    
+    const comuna = document.getElementById('filter-comuna').value.trim();
+    if (comuna) currentFilters.comuna = comuna;
+    
+    const precioMin = document.getElementById('filter-precio-min').value;
+    if (precioMin) currentFilters.precio_min = precioMin;
+    
+    const precioMax = document.getElementById('filter-precio-max').value;
+    if (precioMax) currentFilters.precio_max = precioMax;
+    
+    loadProperties(1);
+}
+
+function clearFilters() {
+    document.getElementById('search').value = '';
+    document.getElementById('filter-operacion').value = '';
+    document.getElementById('filter-tipo').value = '';
+    document.getElementById('filter-comuna').value = '';
+    document.getElementById('filter-precio-min').value = '';
+    document.getElementById('filter-precio-max').value = '';
+    currentFilters = {};
+    loadProperties(1);
+}
+
+function refreshData() {
+    loadProperties(currentPage);
+}
+
+function previousPage() {
+    if (currentPage > 1) {
+        loadProperties(currentPage - 1);
+    }
+}
+
+function nextPage() {
+    if (currentPage < totalPages) {
+        loadProperties(currentPage + 1);
+    }
+}
+
+function viewDetail(propertyId) {
+    fetch(`/api/properties/${propertyId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showDetailModal(data.data);
+            } else {
+                showError('Error al cargar detalle: ' + data.error);
+            }
+        })
+        .catch(error => {
+            showError('Error de conexión: ' + error.message);
+        });
+}
+
+function showDetailModal(property) {
+    document.getElementById('modal-title').textContent = property.titulo || 'Sin título';
+    
+    const content = document.getElementById('modal-content');
+    content.innerHTML = `
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <h3 class="font-semibold text-slate-700">Precio</h3>
+                    <p class="text-lg">${formatPrice(property.precio, property.precio_moneda)}</p>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-slate-700">Operación</h3>
+                    <p>${property.operacion || 'N/A'}</p>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-slate-700">Tipo</h3>
+                    <p>${property.tipo || 'N/A'}</p>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-slate-700">Comuna</h3>
+                    <p>${property.comuna || 'N/A'}</p>
+                </div>
+            </div>
+            
+            ${property.direccion ? `
+                <div>
+                    <h3 class="font-semibold text-slate-700">Dirección</h3>
+                    <p>${property.direccion}</p>
+                </div>
+            ` : ''}
+            
+            ${property.descripcion ? `
+                <div>
+                    <h3 class="font-semibold text-slate-700">Descripción</h3>
+                    <p class="text-sm text-slate-600">${property.descripcion}</p>
+                </div>
+            ` : ''}
+            
+            ${property.features && property.features.length > 0 ? `
+                <div>
+                    <h3 class="font-semibold text-slate-700 mb-2">Características</h3>
+                    <div class="grid grid-cols-2 gap-2">
+                        ${property.features.map(f => `
+                            <div class="text-sm">
+                                <span class="font-medium">${f.key}:</span> ${f.value || 'N/A'}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : ''}
+            
+            ${property.publisher ? `
+                <div>
+                    <h3 class="font-semibold text-slate-700">Publicador</h3>
+                    <p>${property.publisher.nombre} (${property.publisher.tipo})</p>
+                </div>
+            ` : ''}
+            
+            <div class="pt-4 border-t">
+                <a href="${property.url}" target="_blank" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Ver en Portal Inmobiliario
+                    <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                    </svg>
+                </a>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('detail-modal').classList.remove('hidden');
+}
+
+function closeModal() {
+    document.getElementById('detail-modal').classList.add('hidden');
+}
+
+function formatPrice(price, currency) {
+    if (!price) return 'N/A';
+    const formatted = new Intl.NumberFormat('es-CL').format(price);
+    return `${currency || ''} ${formatted}`;
+}
+
+function formatDate(dateString) {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-CL', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function getOperacionClass(operacion) {
+    switch(operacion) {
+        case 'venta':
+            return 'bg-green-100 text-green-800';
+        case 'arriendo':
+            return 'bg-blue-100 text-blue-800';
+        case 'arriendo-de-temporada':
+            return 'bg-purple-100 text-purple-800';
+        default:
+            return 'bg-slate-100 text-slate-800';
+    }
+}
+
+function showError(message) {
+    const tbody = document.getElementById('properties-table');
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="8" class="px-6 py-4 text-center text-red-600">
+                ${message}
+            </td>
+        </tr>
+    `;
+}
+</script>
 {% endblock %}
