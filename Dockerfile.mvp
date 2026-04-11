@@ -1,0 +1,76 @@
+FROM python:3.11-slim
+
+# Metadata
+LABEL maintainer="ja-viers"
+LABEL description="Portal Inmobiliario Scraper MVP - Single Container"
+
+# Variables de entorno
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    DISPLAY=:99 \
+    PGDATA=/var/lib/postgresql/data \
+    OLLAMA_HOST=0.0.0.0:11434 \
+    OLLAMA_MODELS=/app/.ollama/models
+
+# Instalar dependencias del sistema
+RUN apt-get update && apt-get install -y \
+    # PostgreSQL
+    postgresql postgresql-contrib \
+    # Chromium y Selenium
+    chromium chromium-driver \
+    wget curl unzip xvfb \
+    # Ollama dependencies
+    zstd \
+    # Utilidades
+    supervisor procps \
+    && rm -rf /var/lib/apt/lists/*
+
+# Instalar Ollama
+RUN curl -fsSL https://ollama.com/install.sh | sh
+
+# Crear usuario para PostgreSQL y aplicación
+RUN useradd -m -u 1000 scraper && \
+    mkdir -p /app /app/output /app/.ollama/models /var/lib/postgresql/data && \
+    chown -R postgres:postgres /var/lib/postgresql && \
+    chown -R scraper:scraper /app
+
+# Configurar PostgreSQL
+USER postgres
+RUN /etc/init.d/postgresql start && \
+    psql --command "CREATE USER scraper WITH SUPERUSER PASSWORD 'scraper123';" && \
+    createdb -O scraper portalinmobiliario && \
+    /etc/init.d/postgresql stop
+
+# Cambiar a usuario scraper
+USER scraper
+WORKDIR /app
+
+# Copiar requirements y instalar dependencias Python
+COPY --chown=scraper:scraper requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copiar código de la aplicación
+COPY --chown=scraper:scraper . .
+
+# Copiar configuración de Supervisor
+USER root
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Pre-descargar modelos de Ollama (como root para tener permisos)
+RUN ollama serve & \
+    sleep 5 && \
+    ollama pull qwen2.5-coder:1.5b && \
+    pkill ollama && \
+    sleep 2
+
+# Exponer puertos Flask y Ollama
+EXPOSE 5000 11434
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:5000/health || exit 1
+
+# Entrypoint con Supervisor
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

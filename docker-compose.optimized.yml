@@ -1,0 +1,145 @@
+# ============================================================================
+# Docker Compose - Optimized with Profiles
+# Versión: 2.0
+# 
+# Uso:
+#   - Solo scraping (1.2 GB RAM):  docker-compose -f docker-compose.optimized.yml up scraper-core
+#   - Con dashboard (2.0 GB RAM):  docker-compose -f docker-compose.optimized.yml --profile dashboard up
+#   - Con IA (3.5 GB RAM):         docker-compose -f docker-compose.optimized.yml --profile dashboard --profile ai up
+# ============================================================================
+
+version: '3.8'
+
+services:
+  # ==========================================================================
+  # CORE SERVICE (Siempre activo)
+  # Scraper + PostgreSQL + Redis
+  # RAM: ~1.2 GB
+  # ==========================================================================
+  scraper-core:
+    build:
+      context: .
+      dockerfile: Dockerfile.optimized
+    container_name: scraper-core
+    environment:
+      - DATABASE_URL=postgresql://scraper:scraper123@localhost:5432/portalinmobiliario
+      - REDIS_URL=redis://localhost:6379
+      - ENABLE_AI=false
+      - ENABLE_DASHBOARD=false
+      - PYTHONUNBUFFERED=1
+    mem_limit: 1.5g
+    mem_reservation: 1g
+    cpus: 1.5
+    restart: unless-stopped
+    volumes:
+      - ./output:/app/output
+      - postgres-data:/var/lib/postgresql/data
+      - ./logs:/var/log
+    networks:
+      - scraper-network
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "scraper"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ==========================================================================
+  # DASHBOARD SERVICE (Opcional - activar con --profile dashboard)
+  # Flask + Gunicorn + Analytics
+  # RAM adicional: ~800 MB
+  # ==========================================================================
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.optimized
+    container_name: scraper-dashboard
+    depends_on:
+      - scraper-core
+    ports:
+      - "5000:5000"
+    environment:
+      - DATABASE_URL=postgresql://scraper:scraper123@scraper-core:5432/portalinmobiliario
+      - REDIS_URL=redis://scraper-core:6379
+      - ENABLE_AI=${ENABLE_AI:-false}
+      - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1
+    mem_limit: 1g
+    mem_reservation: 512m
+    cpus: 1
+    restart: unless-stopped
+    volumes:
+      - ./output:/app/output
+      - ./logs:/var/log
+    networks:
+      - scraper-network
+    profiles:
+      - dashboard
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ==========================================================================
+  # OLLAMA SERVICE (Opcional - activar con --profile ai)
+  # Modelo IA para chat analytics
+  # RAM adicional: ~1.5 GB
+  # ==========================================================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: scraper-ollama
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    volumes:
+      - ollama-models:/root/.ollama
+    mem_limit: 2g
+    mem_reservation: 1g
+    cpus: 2
+    restart: unless-stopped
+    networks:
+      - scraper-network
+    profiles:
+      - ai
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ==========================================================================
+  # REDIS STANDALONE (Opcional - si se quiere Redis separado)
+  # Cache layer independiente
+  # RAM: ~50 MB
+  # ==========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: scraper-redis
+    command: redis-server --maxmemory 50mb --maxmemory-policy allkeys-lru
+    mem_limit: 100m
+    mem_reservation: 50m
+    cpus: 0.5
+    restart: unless-stopped
+    networks:
+      - scraper-network
+    profiles:
+      - redis-standalone
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  postgres-data:
+    driver: local
+  ollama-models:
+    driver: local
+
+networks:
+  scraper-network:
+    driver: bridge
