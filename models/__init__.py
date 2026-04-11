@@ -9,6 +9,8 @@ from .feature import Feature
 from .image import Image
 from .publisher import Publisher
 from .scheduler import SchedulerExecution, SchedulerState
+from .opportunity import Opportunity
+from .analytics_cache import AnalyticsCache
 
 __all__ = [
     "Property",
@@ -17,4 +19,6 @@ __all__ = [
     "Publisher",
     "SchedulerExecution",
     "SchedulerState",
+    "Opportunity",
+    "AnalyticsCache",
 ]

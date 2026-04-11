@@ -64,6 +64,12 @@ class Property(Base):
     # Additional data from detail page
     descripcion = Column(String(5000), nullable=True)
     
+    # Analytics fields
+    superficie_util = Column(Integer, nullable=True)
+    dormitorios = Column(Integer, nullable=True)
+    banos = Column(Integer, nullable=True)
+    precio_m2 = Column(Integer, nullable=True)
+    
     # Metadata
     publicado_en = Column(DateTime, nullable=True)
     scrapeado_en = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -87,6 +93,12 @@ class Property(Base):
         back_populates="property",
         uselist=False,
         cascade="all, delete-orphan"
+    )
+    opportunities = relationship(
+        "Opportunity",
+        back_populates="property",
+        cascade="all, delete-orphan",
+        lazy="dynamic"
     )
     
     def __repr__(self) -> str:
