@@ -7,7 +7,7 @@
     <!-- Header -->
     <div class="flex items-center justify-between">
         <div>
-            <a href="{{ url_for('dashboard.data') }}" class="text-blue-600 hover:text-blue-800 flex items-center gap-2 mb-2">
+            <a href="{{ url_for('main.data') }}" class="text-blue-600 hover:text-blue-800 flex items-center gap-2 mb-2">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
                 </svg>
@@ -45,8 +45,8 @@
                         <p class="text-lg font-semibold text-slate-900">{{ property.tipo or 'N/A' }}</p>
                     </div>
                     <div>
-                        <h3 class="text-sm font-medium text-slate-600 mb-1">Comuna</h3>
-                        <p class="text-lg font-semibold text-slate-900">{{ property.comuna or 'N/A' }}</p>
+                        <h3 class="text-sm font-medium text-slate-600 mb-1">Ubicación</h3>
+                        <p class="text-lg font-semibold text-slate-900">{{ property.ubicacion or property.comuna or 'N/A' }}</p>
                     </div>
                 </div>
 
@@ -185,7 +185,7 @@
                     <button onclick="window.print()" class="block w-full px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors">
                         Imprimir Detalle
                     </button>
-                    <a href="{{ url_for('dashboard.data') }}" class="block w-full px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-center">
+                    <a href="{{ url_for('main.data') }}" class="block w-full px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-center">
                         Volver al Explorador
                     </a>
                 </div>

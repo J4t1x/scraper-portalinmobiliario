@@ -3,36 +3,60 @@
 {% block title %}Explorador de Datos - Portal Inmobiliario Scraper{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
+<div class="space-y-4 md:space-y-6">
     <!-- Header -->
-    <div class="flex justify-between items-center">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-            <h1 class="text-3xl font-bold text-slate-900">Explorador de Datos</h1>
-            <p class="text-slate-600 mt-1">Total de propiedades: <span id="total-count">{{ total }}</span></p>
+            <h1 class="text-2xl md:text-3xl font-bold text-slate-900">Explorador de Datos</h1>
+            <p class="text-slate-600 mt-1 text-sm md:text-base">Total de propiedades: <span id="total-count">{{ total }}</span></p>
         </div>
-        <button onclick="refreshData()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-            <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-            </svg>
-            Actualizar
-        </button>
+        <div class="flex gap-2 self-start sm:self-auto">
+            <!-- Toggle Vista -->
+            <div class="flex bg-slate-200 rounded-lg p-1">
+                <button id="view-table" onclick="setView('table')" class="px-3 py-2 rounded-md text-sm font-medium transition-colors bg-white text-slate-900 shadow-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                    </svg>
+                </button>
+                <button id="view-cards" onclick="setView('cards')" class="px-3 py-2 rounded-md text-sm font-medium transition-colors text-slate-600 hover:text-slate-900">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+                    </svg>
+                </button>
+            </div>
+            <button onclick="refreshData()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm md:text-base">
+                <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.001 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                <span class="hidden sm:inline">Actualizar</span>
+            </button>
+        </div>
     </div>
 
     <!-- Filtros -->
-    <div class="bg-white rounded-lg shadow p-6 border border-slate-200">
+    <div class="bg-white rounded-lg shadow p-4 md:p-6 border border-slate-200">
         <h2 class="text-lg font-semibold text-slate-900 mb-4">Filtros</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Archivo JSON -->
+            <div class="sm:col-span-2 lg:col-span-1">
+                <label class="block text-sm font-medium text-slate-700 mb-2">Archivo JSON</label>
+                <select id="filter-file" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
+                    <option value="">Cargando archivos...</option>
+                </select>
+                <div id="file-info" class="text-xs text-slate-500 mt-1 break-words"></div>
+            </div>
+
             <!-- Búsqueda -->
-            <div>
+            <div class="sm:col-span-2 lg:col-span-1">
                 <label class="block text-sm font-medium text-slate-700 mb-2">Búsqueda</label>
-                <input type="text" id="search" placeholder="Buscar por título..." 
-                    class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <input type="text" id="search" placeholder="Buscar por título..."
+                    class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
             </div>
 
             <!-- Operación -->
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-2">Operación</label>
-                <select id="filter-operacion" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <select id="filter-operacion" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
                     <option value="">Todas</option>
                     <option value="venta">Venta</option>
                     <option value="arriendo">Arriendo</option>
@@ -43,7 +67,7 @@
             <!-- Tipo -->
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-2">Tipo</label>
-                <select id="filter-tipo" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <select id="filter-tipo" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
                     <option value="">Todos</option>
                     <option value="departamento">Departamento</option>
                     <option value="casa">Casa</option>
@@ -56,55 +80,53 @@
             <!-- Comuna -->
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-2">Comuna</label>
-                <input type="text" id="filter-comuna" placeholder="Ej: Santiago, Providencia..." 
-                    class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <input type="text" id="filter-comuna" placeholder="Ej: Santiago, Providencia..."
+                    class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
             </div>
 
             <!-- Precio Mínimo -->
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-2">Precio Mínimo</label>
-                <input type="number" id="filter-precio-min" placeholder="0" 
-                    class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <input type="number" id="filter-precio-min" placeholder="0"
+                    class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
             </div>
 
             <!-- Precio Máximo -->
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-2">Precio Máximo</label>
-                <input type="number" id="filter-precio-max" placeholder="999999999" 
-                    class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <input type="number" id="filter-precio-max" placeholder="999999999"
+                    class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
             </div>
 
             <!-- Botones -->
             <div class="flex items-end gap-2">
-                <button onclick="applyFilters()" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                <button onclick="applyFilters()" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm">
                     Filtrar
                 </button>
-                <button onclick="clearFilters()" class="flex-1 px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors">
+                <button onclick="clearFilters()" class="flex-1 px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors text-sm">
                     Limpiar
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- Tabla de Propiedades -->
-    <div class="bg-white rounded-lg shadow border border-slate-200 overflow-hidden">
-        <div class="overflow-x-auto">
+    <!-- Vista de Tabla (Responsive) -->
+    <div id="table-view" class="bg-white rounded-lg shadow border border-slate-200 overflow-hidden">
+        <!-- Desktop Table (md and up) -->
+        <div class="hidden md:block overflow-x-auto">
             <table class="min-w-full divide-y divide-slate-200">
                 <thead class="bg-slate-50">
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">ID</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Título</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Precio</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Operación</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Tipo</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Comuna</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Scrapeado</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Acciones</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Título</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider w-32">Precio</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider w-24">Operación</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider w-24">Tipo</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider w-32">Acciones</th>
                     </tr>
                 </thead>
-                <tbody id="properties-table" class="bg-white divide-y divide-slate-200">
+                <tbody id="properties-table-desktop" class="bg-white divide-y divide-slate-200">
                     <tr>
-                        <td colspan="8" class="px-6 py-4 text-center text-slate-500">
+                        <td colspan="5" class="px-4 py-4 text-center text-slate-500">
                             Cargando propiedades...
                         </td>
                     </tr>
@@ -112,24 +134,44 @@
             </table>
         </div>
 
-        <!-- Paginación -->
-        <div class="bg-slate-50 px-6 py-4 flex items-center justify-between border-t border-slate-200">
-            <div class="flex-1 flex justify-between sm:hidden">
-                <button onclick="previousPage()" class="relative inline-flex items-center px-4 py-2 border border-slate-300 text-sm font-medium rounded-md text-slate-700 bg-white hover:bg-slate-50">
-                    Anterior
-                </button>
-                <button onclick="nextPage()" class="ml-3 relative inline-flex items-center px-4 py-2 border border-slate-300 text-sm font-medium rounded-md text-slate-700 bg-white hover:bg-slate-50">
-                    Siguiente
-                </button>
+        <!-- Mobile Card List (< md) -->
+        <div id="properties-table-mobile" class="md:hidden divide-y divide-slate-200">
+            <div class="px-4 py-4 text-center text-slate-500">
+                Cargando propiedades...
             </div>
-            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                <div>
+        </div>
+
+        <!-- Paginación Tabla -->
+        <div class="bg-slate-50 px-4 md:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-200">
+            <div class="text-sm text-slate-700 text-center sm:text-left">
+                <p class="text-sm text-slate-700">
+                    Mostrando <span id="showing-from">0</span> a <span id="showing-to">0</span> de <span id="showing-total">0</span> resultados
+                </p>
+            </div>
+            <div class="flex items-center justify-center sm:justify-end w-full sm:w-auto">
+                <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" id="pagination-controls">
+                    <!-- Pagination buttons will be inserted here -->
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vista de Tarjetas (Mobile-friendly) -->
+    <div id="cards-view" class="hidden">
+        <div id="properties-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <!-- Cards will be inserted here -->
+        </div>
+        
+        <!-- Paginación Tarjetas -->
+        <div class="mt-6 bg-white rounded-lg shadow border border-slate-200 p-4">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="text-sm text-slate-700 text-center sm:text-left">
                     <p class="text-sm text-slate-700">
-                        Mostrando <span id="showing-from">0</span> a <span id="showing-to">0</span> de <span id="showing-total">0</span> resultados
+                        Mostrando <span id="showing-from-cards">0</span> a <span id="showing-to-cards">0</span> de <span id="showing-total-cards">0</span> resultados
                     </p>
                 </div>
-                <div>
-                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" id="pagination-controls">
+                <div class="flex items-center justify-center sm:justify-end w-full sm:w-auto">
+                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" id="pagination-controls-cards">
                         <!-- Pagination buttons will be inserted here -->
                     </nav>
                 </div>
@@ -139,17 +181,19 @@
 </div>
 
 <!-- Modal de Detalle -->
-<div id="detail-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div class="p-6">
-            <div class="flex justify-between items-start mb-4">
-                <h2 class="text-2xl font-bold text-slate-900" id="modal-title">Detalle de Propiedad</h2>
-                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600">
+<div id="detail-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-lg max-w-5xl w-full my-8">
+        <div class="sticky top-0 bg-white border-b border-slate-200 px-4 sm:px-6 py-4 rounded-t-lg">
+            <div class="flex justify-between items-start">
+                <h2 class="text-xl sm:text-2xl font-bold text-slate-900 pr-4" id="modal-title">Detalle de Propiedad</h2>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 flex-shrink-0">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                     </svg>
                 </button>
             </div>
+        </div>
+        <div class="p-4 sm:p-6 max-h-[calc(90vh-80px)] overflow-y-auto">
             <div id="modal-content">
                 <!-- Content will be loaded here -->
             </div>
@@ -161,11 +205,15 @@
 let currentPage = 1;
 let totalPages = 1;
 let currentFilters = {};
+let selectedFile = '';
+let availableFiles = [];
+let currentView = 'table';
 
 // Cargar datos al iniciar
 document.addEventListener('DOMContentLoaded', function() {
+    loadJsonFiles();
     loadProperties();
-    
+
     // Búsqueda en tiempo real (con debounce)
     let searchTimeout;
     document.getElementById('search').addEventListener('input', function() {
@@ -174,24 +222,99 @@ document.addEventListener('DOMContentLoaded', function() {
             applyFilters();
         }, 500);
     });
+
+    // Manejar cambio de archivo
+    document.getElementById('filter-file').addEventListener('change', function() {
+        selectedFile = this.value;
+        updateFileInfo();
+        loadProperties(1);
+    });
 });
+
+function loadJsonFiles() {
+    fetch('/api/json-files')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                availableFiles = data.data.files;
+                const latestFile = data.data.latest;
+
+                // Populate dropdown
+                const select = document.getElementById('filter-file');
+                select.innerHTML = '<option value="">Todos los archivos</option>';
+
+                availableFiles.forEach(file => {
+                    const option = document.createElement('option');
+                    option.value = file.filename;
+                    const metadata = file.metadata || {};
+                    const label = `${file.filename} (${metadata.total || '?'} propiedades)`;
+                    option.textContent = label;
+                    if (latestFile && file.filename === latestFile.filename) {
+                        option.textContent += ' (Último)';
+                    }
+                    select.appendChild(option);
+                });
+
+                // Select latest file by default
+                if (latestFile) {
+                    selectedFile = latestFile.filename;
+                    select.value = latestFile.filename;
+                    updateFileInfo(latestFile);
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error loading JSON files:', error);
+        });
+}
+
+function updateFileInfo(fileInfo = null) {
+    const infoDiv = document.getElementById('file-info');
+    if (!selectedFile) {
+        infoDiv.textContent = 'Todos los archivos combinados';
+        return;
+    }
+
+    const file = fileInfo || availableFiles.find(f => f.filename === selectedFile);
+    if (file) {
+        const metadata = file.metadata || {};
+        const total = metadata.total || '?';
+        const operacion = metadata.operacion || 'N/A';
+        const tipo = metadata.tipo || 'N/A';
+        const fecha = file.modified ? new Date(file.modified).toLocaleString('es-CL') : 'N/A';
+        infoDiv.textContent = `${total} propiedades | ${operacion} ${tipo} | ${fecha}`;
+    }
+}
 
 function loadProperties(page = 1) {
     currentPage = page;
-    
+
     // Construir query string
     const params = new URLSearchParams({
         page: page,
         per_page: 20,
         ...currentFilters
     });
-    
+
+    // Agregar parámetro de archivo si está seleccionado
+    if (selectedFile) {
+        params.append('file', selectedFile);
+    }
+
     fetch(`/api/properties?${params}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                renderTable(data.data);
-                renderPagination(data.pagination);
+                if (currentView === 'table') {
+                    renderTable(data.data);
+                    renderPagination(data.pagination);
+                } else {
+                    renderCards(data.data);
+                    renderPaginationCards(data.pagination);
+                }
+                if (data.file_info) {
+                    updateFileResponseInfo(data.file_info);
+                }
             } else {
                 showError('Error al cargar propiedades: ' + data.error);
             }
@@ -201,45 +324,169 @@ function loadProperties(page = 1) {
         });
 }
 
+function updateFileResponseInfo(fileInfo) {
+    const infoDiv = document.getElementById('file-info');
+    if (fileInfo.is_latest) {
+        infoDiv.textContent = `${fileInfo.filename} (Último archivo)`;
+    } else if (fileInfo.filename === 'all') {
+        infoDiv.textContent = 'Todos los archivos combinados';
+    } else {
+        infoDiv.textContent = fileInfo.filename;
+    }
+}
+
 function renderTable(properties) {
-    const tbody = document.getElementById('properties-table');
-    
+    const tbodyDesktop = document.getElementById('properties-table-desktop');
+    const containerMobile = document.getElementById('properties-table-mobile');
+
     if (properties.length === 0) {
-        tbody.innerHTML = `
+        tbodyDesktop.innerHTML = `
             <tr>
-                <td colspan="8" class="px-6 py-4 text-center text-slate-500">
+                <td colspan="5" class="px-4 py-4 text-center text-slate-500">
                     No se encontraron propiedades con los filtros seleccionados
                 </td>
             </tr>
         `;
+        containerMobile.innerHTML = `
+            <div class="px-4 py-8 text-center text-slate-500">
+                No se encontraron propiedades con los filtros seleccionados
+            </div>
+        `;
         return;
     }
-    
-    tbody.innerHTML = properties.map(prop => `
+
+    // Render Desktop Table
+    tbodyDesktop.innerHTML = properties.map(prop => `
         <tr class="hover:bg-slate-50">
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900">${prop.portal_id || prop.id}</td>
-            <td class="px-6 py-4 text-sm text-slate-900">
-                <div class="max-w-xs truncate" title="${prop.titulo || 'Sin título'}">${prop.titulo || 'Sin título'}</div>
+            <td class="px-4 py-4 text-sm text-slate-900">
+                <div class="max-w-md truncate" title="${prop.titulo || 'Sin título'}">${prop.titulo || 'Sin título'}</div>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+            <td class="px-4 py-4 whitespace-nowrap text-sm font-semibold text-slate-900">
                 ${formatPrice(prop.precio, prop.precio_moneda)}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm">
+            <td class="px-4 py-4 whitespace-nowrap text-sm">
                 <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getOperacionClass(prop.operacion)}">
                     ${prop.operacion || 'N/A'}
                 </span>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900">${prop.tipo || 'N/A'}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900">${prop.comuna || 'N/A'}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                ${formatDate(prop.scrapeado_en)}
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                <a href="/property/${prop.id}" class="text-blue-600 hover:text-blue-900 mr-3">Ver</a>
-                <button onclick="viewDetail(${prop.id})" class="text-purple-600 hover:text-purple-900 mr-3">Modal</button>
-                <a href="${prop.url}" target="_blank" class="text-green-600 hover:text-green-900">Portal</a>
+            <td class="px-4 py-4 whitespace-nowrap text-sm text-slate-900">${prop.tipo || 'N/A'}</td>
+            <td class="px-4 py-4 whitespace-nowrap text-sm font-medium">
+                <a href="/property/${prop.id}" class="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 mr-1">Ver</a>
+                <button onclick="viewDetail('${prop.id}')" class="px-3 py-1 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 mr-1">Modal</button>
+                <a href="${prop.url}" target="_blank" class="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700">Portal</a>
             </td>
         </tr>
+    `).join('');
+
+    // Render Mobile Cards
+    containerMobile.innerHTML = properties.map(prop => `
+        <div class="p-4 hover:bg-slate-50 transition-colors">
+            <!-- Header: Operación y Tipo -->
+            <div class="flex items-center justify-between mb-2">
+                <span class="px-2 py-1 text-xs font-semibold rounded-full ${getOperacionClass(prop.operacion)}">
+                    ${prop.operacion || 'N/A'}
+                </span>
+                <span class="text-xs text-slate-500">${prop.tipo || 'N/A'}</span>
+            </div>
+            
+            <!-- Título -->
+            <h3 class="text-sm font-semibold text-slate-900 mb-2 line-clamp-2" title="${prop.titulo || 'Sin título'}">
+                ${prop.titulo || 'Sin título'}
+            </h3>
+            
+            <!-- Precio -->
+            <div class="text-lg font-bold text-blue-600 mb-2">
+                ${formatPrice(prop.precio, prop.precio_moneda)}
+            </div>
+            
+            <!-- Comuna y Fecha -->
+            <div class="flex items-center justify-between text-xs text-slate-500 mb-3">
+                <div class="flex items-center">
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    <span class="truncate">${prop.comuna || 'N/A'}</span>
+                </div>
+                <span>${formatDate(prop.scrapeado_en)}</span>
+            </div>
+            
+            <!-- Acciones -->
+            <div class="flex gap-2">
+                <button onclick="viewDetail('${prop.id}')" class="flex-1 px-3 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors">
+                    Ver Detalle
+                </button>
+                <a href="${prop.url}" target="_blank" class="px-3 py-2 bg-slate-200 text-slate-700 text-xs rounded-lg hover:bg-slate-300 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                    </svg>
+                </a>
+            </div>
+        </div>
+    `).join('');
+}
+
+function renderCards(properties) {
+    const container = document.getElementById('properties-cards');
+
+    if (properties.length === 0) {
+        container.innerHTML = `
+            <div class="col-span-full text-center py-12 text-slate-500">
+                No se encontraron propiedades con los filtros seleccionados
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = properties.map(prop => `
+        <div class="bg-white rounded-lg shadow-md border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow">
+            <div class="p-4">
+                <!-- Header -->
+                <div class="flex items-start justify-between mb-3">
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full ${getOperacionClass(prop.operacion)}">
+                        ${prop.operacion || 'N/A'}
+                    </span>
+                    <span class="text-xs text-slate-500">${prop.tipo || 'N/A'}</span>
+                </div>
+                
+                <!-- Título -->
+                <h3 class="text-base font-semibold text-slate-900 mb-2 line-clamp-2 min-h-[3rem]" title="${prop.titulo || 'Sin título'}">
+                    ${prop.titulo || 'Sin título'}
+                </h3>
+                
+                <!-- Precio -->
+                <div class="text-xl font-bold text-blue-600 mb-3">
+                    ${formatPrice(prop.precio, prop.precio_moneda)}
+                </div>
+                
+                <!-- Ubicación -->
+                <div class="flex items-center text-sm text-slate-600 mb-3">
+                    <svg class="w-4 h-4 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    <span class="truncate">${prop.comuna || 'N/A'}</span>
+                </div>
+                
+                <!-- ID y Fecha -->
+                <div class="text-xs text-slate-500 mb-4 space-y-1">
+                    <div class="truncate">ID: ${prop.portal_id || prop.id}</div>
+                    <div>Scrapeado: ${formatDate(prop.scrapeado_en)}</div>
+                </div>
+                
+                <!-- Acciones -->
+                <div class="flex gap-2">
+                    <button onclick="viewDetail('${prop.id}')" class="flex-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors">
+                        Ver Detalle
+                    </button>
+                    <a href="${prop.url}" target="_blank" class="px-3 py-2 bg-slate-200 text-slate-700 text-sm rounded-lg hover:bg-slate-300 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </div>
     `).join('');
 }
 
@@ -283,6 +530,55 @@ function renderPagination(pagination) {
     }
     
     // Next button
+    html += `
+        <button onclick="nextPage()" ${currentPage === totalPages ? 'disabled' : ''} 
+            class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-slate-300 bg-white text-sm font-medium text-slate-500 hover:bg-slate-50 ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : ''}">
+            <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+            </svg>
+        </button>
+    `;
+    
+    controls.innerHTML = html;
+}
+
+function renderPaginationCards(pagination) {
+    totalPages = pagination.pages;
+    
+    document.getElementById('showing-from-cards').textContent = (pagination.page - 1) * pagination.per_page + 1;
+    document.getElementById('showing-to-cards').textContent = Math.min(pagination.page * pagination.per_page, pagination.total);
+    document.getElementById('showing-total-cards').textContent = pagination.total;
+    document.getElementById('total-count').textContent = pagination.total;
+    
+    const controls = document.getElementById('pagination-controls-cards');
+    let html = '';
+    
+    html += `
+        <button onclick="previousPage()" ${currentPage === 1 ? 'disabled' : ''} 
+            class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-slate-300 bg-white text-sm font-medium text-slate-500 hover:bg-slate-50 ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : ''}">
+            <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/>
+            </svg>
+        </button>
+    `;
+    
+    const maxButtons = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+    let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+    
+    if (endPage - startPage < maxButtons - 1) {
+        startPage = Math.max(1, endPage - maxButtons + 1);
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+        html += `
+            <button onclick="loadProperties(${i})" 
+                class="relative inline-flex items-center px-4 py-2 border border-slate-300 text-sm font-medium ${i === currentPage ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 hover:bg-slate-50'}">
+                ${i}
+            </button>
+        `;
+    }
+    
     html += `
         <button onclick="nextPage()" ${currentPage === totalPages ? 'disabled' : ''} 
             class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-slate-300 bg-white text-sm font-medium text-slate-500 hover:bg-slate-50 ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : ''}">
@@ -366,66 +662,112 @@ function showDetailModal(property) {
     
     const content = document.getElementById('modal-content');
     content.innerHTML = `
-        <div class="space-y-4">
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <h3 class="font-semibold text-slate-700">Precio</h3>
-                    <p class="text-lg">${formatPrice(property.precio, property.precio_moneda)}</p>
+        <div class="space-y-6">
+            <!-- Información Principal -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-blue-50 p-4 rounded-lg">
+                    <h3 class="text-xs font-medium text-blue-700 uppercase mb-1">Precio</h3>
+                    <p class="text-xl sm:text-2xl font-bold text-blue-900">${formatPrice(property.precio, property.precio_moneda)}</p>
                 </div>
-                <div>
-                    <h3 class="font-semibold text-slate-700">Operación</h3>
-                    <p>${property.operacion || 'N/A'}</p>
+                <div class="bg-slate-50 p-4 rounded-lg">
+                    <h3 class="text-xs font-medium text-slate-700 uppercase mb-1">Operación</h3>
+                    <span class="inline-block px-3 py-1 text-sm font-semibold rounded-full ${getOperacionClass(property.operacion)}">
+                        ${property.operacion || 'N/A'}
+                    </span>
                 </div>
-                <div>
-                    <h3 class="font-semibold text-slate-700">Tipo</h3>
-                    <p>${property.tipo || 'N/A'}</p>
+                <div class="bg-slate-50 p-4 rounded-lg">
+                    <h3 class="text-xs font-medium text-slate-700 uppercase mb-1">Tipo</h3>
+                    <p class="text-lg font-semibold text-slate-900 capitalize">${property.tipo || 'N/A'}</p>
                 </div>
-                <div>
-                    <h3 class="font-semibold text-slate-700">Comuna</h3>
-                    <p>${property.comuna || 'N/A'}</p>
+                <div class="bg-slate-50 p-4 rounded-lg">
+                    <h3 class="text-xs font-medium text-slate-700 uppercase mb-1">Comuna</h3>
+                    <p class="text-lg font-semibold text-slate-900">${property.comuna || 'N/A'}</p>
                 </div>
             </div>
             
-            ${property.direccion ? `
-                <div>
-                    <h3 class="font-semibold text-slate-700">Dirección</h3>
-                    <p>${property.direccion}</p>
+            <!-- Ubicación -->
+            ${property.direccion || property.ubicacion ? `
+                <div class="bg-slate-50 p-4 rounded-lg">
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-slate-600 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                        <div>
+                            <h3 class="text-xs font-medium text-slate-700 uppercase mb-1">Ubicación</h3>
+                            <p class="text-sm text-slate-900">${property.direccion || property.ubicacion}</p>
+                        </div>
+                    </div>
                 </div>
             ` : ''}
             
+            <!-- Descripción -->
             ${property.descripcion ? `
                 <div>
-                    <h3 class="font-semibold text-slate-700">Descripción</h3>
-                    <p class="text-sm text-slate-600">${property.descripcion}</p>
+                    <h3 class="text-sm font-semibold text-slate-900 mb-2">Descripción</h3>
+                    <p class="text-sm text-slate-600 leading-relaxed">${property.descripcion}</p>
                 </div>
             ` : ''}
             
+            <!-- Atributos -->
+            ${property.atributos ? `
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-900 mb-3">Atributos</h3>
+                    <div class="bg-slate-50 p-4 rounded-lg">
+                        <p class="text-sm text-slate-700">${property.atributos}</p>
+                    </div>
+                </div>
+            ` : ''}
+            
+            <!-- Características -->
             ${property.features && property.features.length > 0 ? `
                 <div>
-                    <h3 class="font-semibold text-slate-700 mb-2">Características</h3>
-                    <div class="grid grid-cols-2 gap-2">
+                    <h3 class="text-sm font-semibold text-slate-900 mb-3">Características</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         ${property.features.map(f => `
-                            <div class="text-sm">
-                                <span class="font-medium">${f.key}:</span> ${f.value || 'N/A'}
+                            <div class="bg-slate-50 p-3 rounded-lg">
+                                <span class="text-xs font-medium text-slate-600 block mb-1">${f.key}</span>
+                                <span class="text-sm font-semibold text-slate-900">${f.value || 'N/A'}</span>
                             </div>
                         `).join('')}
                     </div>
                 </div>
             ` : ''}
             
+            <!-- Publicador -->
             ${property.publisher ? `
-                <div>
-                    <h3 class="font-semibold text-slate-700">Publicador</h3>
-                    <p>${property.publisher.nombre} (${property.publisher.tipo})</p>
+                <div class="bg-slate-50 p-4 rounded-lg">
+                    <h3 class="text-xs font-medium text-slate-700 uppercase mb-2">Publicador</h3>
+                    <p class="text-sm text-slate-900">
+                        <span class="font-semibold">${property.publisher.nombre}</span>
+                        <span class="text-slate-600"> (${property.publisher.tipo})</span>
+                    </p>
                 </div>
             ` : ''}
             
-            <div class="pt-4 border-t">
-                <a href="${property.url}" target="_blank" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                    Ver en Portal Inmobiliario
-                    <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <!-- Metadata -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-500">
+                <div class="bg-slate-50 p-3 rounded-lg">
+                    <span class="font-medium">ID Portal:</span> ${property.portal_id || property.id}
+                </div>
+                <div class="bg-slate-50 p-3 rounded-lg">
+                    <span class="font-medium">Scrapeado:</span> ${formatDate(property.scrapeado_en)}
+                </div>
+            </div>
+            
+            <!-- Acciones -->
+            <div class="pt-4 border-t border-slate-200 flex flex-col sm:flex-row gap-3">
+                <a href="${property.url}" target="_blank" class="flex-1 inline-flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
                     </svg>
+                    Ver en Portal Inmobiliario
+                </a>
+                <a href="/property/${property.id}" class="flex-1 inline-flex items-center justify-center px-4 py-3 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors font-medium">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Ver Página Completa
                 </a>
             </div>
         </div>
@@ -463,15 +805,59 @@ function getOperacionClass(operacion) {
     }
 }
 
+function setView(view) {
+    currentView = view;
+    
+    const tableView = document.getElementById('table-view');
+    const cardsView = document.getElementById('cards-view');
+    const tableBtn = document.getElementById('view-table');
+    const cardsBtn = document.getElementById('view-cards');
+    
+    if (view === 'table') {
+        tableView.classList.remove('hidden');
+        cardsView.classList.add('hidden');
+        tableBtn.classList.add('bg-white', 'text-slate-900', 'shadow-sm');
+        tableBtn.classList.remove('text-slate-600', 'hover:text-slate-900');
+        cardsBtn.classList.remove('bg-white', 'text-slate-900', 'shadow-sm');
+        cardsBtn.classList.add('text-slate-600', 'hover:text-slate-900');
+    } else {
+        tableView.classList.add('hidden');
+        cardsView.classList.remove('hidden');
+        cardsBtn.classList.add('bg-white', 'text-slate-900', 'shadow-sm');
+        cardsBtn.classList.remove('text-slate-600', 'hover:text-slate-900');
+        tableBtn.classList.remove('bg-white', 'text-slate-900', 'shadow-sm');
+        tableBtn.classList.add('text-slate-600', 'hover:text-slate-900');
+    }
+    
+    loadProperties(currentPage);
+}
+
 function showError(message) {
-    const tbody = document.getElementById('properties-table');
-    tbody.innerHTML = `
-        <tr>
-            <td colspan="8" class="px-6 py-4 text-center text-red-600">
+    if (currentView === 'table') {
+        const tbodyDesktop = document.getElementById('properties-table-desktop');
+        const containerMobile = document.getElementById('properties-table-mobile');
+        
+        tbodyDesktop.innerHTML = `
+            <tr>
+                <td colspan="8" class="px-6 py-4 text-center text-red-600">
+                    ${message}
+                </td>
+            </tr>
+        `;
+        
+        containerMobile.innerHTML = `
+            <div class="px-4 py-8 text-center text-red-600">
                 ${message}
-            </td>
-        </tr>
-    `;
+            </div>
+        `;
+    } else {
+        const container = document.getElementById('properties-cards');
+        container.innerHTML = `
+            <div class="col-span-full text-center py-12 text-red-600">
+                ${message}
+            </div>
+        `;
+    }
 }
 </script>
 {% endblock %}

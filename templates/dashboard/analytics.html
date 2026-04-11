@@ -1,13 +1,147 @@
 {% extends "base.html" %}
 
-{% block title %}Analytics - Portal Inmobiliario Scraper{% endblock %}
+{% block title %}Analytics Avanzado - Portal Inmobiliario Scraper{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
-    <h1 class="text-3xl font-bold text-slate-900">Analytics Avanzado</h1>
+<div class="h-[calc(100vh-8rem)] flex flex-col" x-data="chatAgent()">
+    <div class="mb-4">
+        <h1 class="text-3xl font-bold text-slate-900">Agente de Analítica AI</h1>
+        <p class="text-slate-600 mt-1">Haz preguntas sobre los datos recolectados y el mercado inmobiliario.</p>
+    </div>
     
-    <div class="bg-white rounded-lg shadow p-6 border border-slate-200">
-        <p class="text-slate-600">Los analytics avanzados se implementarán en la Fase 5</p>
+    <!-- Chat Container -->
+    <div class="flex-1 bg-white rounded-lg shadow border border-slate-200 flex flex-col overflow-hidden max-h-full">
+        
+        <!-- Messages Area -->
+        <div id="chat-messages" class="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50">
+            <!-- Default Welcome Message -->
+            <div class="flex items-start gap-4">
+                <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0 mt-1">
+                    <i data-lucide="bot" class="text-white w-6 h-6"></i>
+                </div>
+                <div class="bg-white border border-slate-200 rounded-2xl rounded-tl-sm p-4 max-w-[85%] shadow-sm">
+                    <p class="text-slate-800 leading-relaxed">¡Hola! Soy tu asistente de analítica inmobiliaria. He analizado el dataset actual de propiedades. ¿En qué te puedo ayudar hoy?</p>
+                </div>
+            </div>
+
+            <!-- Dynamic Messages -->
+            <template x-for="(msg, index) in messages" :key="index">
+                <div class="flex items-start gap-4" :class="msg.role === 'user' ? 'flex-row-reverse' : ''">
+                    <div class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 mt-1"
+                         :class="msg.role === 'user' ? 'bg-slate-800' : 'bg-blue-600'">
+                        <i :data-lucide="msg.role === 'user' ? 'user' : 'bot'" class="text-white w-6 h-6"></i>
+                    </div>
+                    <div class="rounded-2xl p-4 max-w-[85%] shadow-sm"
+                         :class="msg.role === 'user' ? 'bg-slate-800 text-white rounded-tr-sm' : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm'">
+                        <div class="prose prose-sm max-w-none" 
+                             :class="msg.role === 'user' ? 'prose-invert' : ''"
+                             x-html="formatMessage(msg.content)"></div>
+                    </div>
+                </div>
+            </template>
+            
+            <!-- Loading Indicator -->
+            <div class="flex items-start gap-4" x-show="loading" style="display: none;">
+                <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0 mt-1">
+                    <i data-lucide="bot" class="text-white w-6 h-6"></i>
+                </div>
+                <div class="bg-white border border-slate-200 rounded-2xl rounded-tl-sm p-5 shadow-sm flex space-x-2 items-center h-14">
+                    <div class="w-2 h-2 rounded-full bg-slate-400 animate-bounce"></div>
+                    <div class="w-2 h-2 rounded-full bg-slate-400 animate-bounce" style="animation-delay: 0.15s;"></div>
+                    <div class="w-2 h-2 rounded-full bg-slate-400 animate-bounce" style="animation-delay: 0.3s;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="p-4 bg-white border-t border-slate-200">
+            <form @submit.prevent="sendMessage" class="flex gap-4">
+                <input type="text" x-model="inputText" 
+                       class="flex-1 rounded-xl border border-slate-300 px-5 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                       placeholder="Ej: ¿Cuál es el precio promedio de un departamento de 2 habitaciones en Ñuñoa?"
+                       :disabled="loading"
+                       autocomplete="off">
+                <button type="submit" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl flex items-center gap-2 transition-all disabled:opacity-50 touch-manipulation disabled:cursor-not-allowed"
+                        :disabled="loading || inputText.trim() === ''">
+                    <span x-show="!loading" class="font-medium">Preguntar</span>
+                    <i data-lucide="send" class="w-5 h-5" x-show="!loading"></i>
+                    <i data-lucide="loader-2" class="w-5 h-5 animate-spin" x-show="loading" style="display: none;"></i>
+                </button>
+            </form>
+        </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<!-- Tailwind Typography para renderizar Markdown con estilos decentes -->
+<script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('chatAgent', () => ({
+            messages: [],
+            inputText: '',
+            loading: false,
+
+            formatMessage(text) {
+                if (typeof marked !== 'undefined') {
+                    // Configurar marked para evitar parrafos que rompan todo, etc
+                    marked.setOptions({
+                        breaks: true,
+                        gfm: true
+                    });
+                    return marked.parse(text);
+                }
+                return text.replace(/\n/g, '<br>');
+            },
+
+            async sendMessage() {
+                const text = this.inputText.trim();
+                if (!text || this.loading) return;
+
+                // Añadir msj de usuario
+                this.messages.push({ role: 'user', content: text });
+                this.inputText = '';
+                this.loading = true;
+                
+                this.scrollToBottom();
+
+                try {
+                    const response = await fetch('/api/analytics/chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ message: text })
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.messages.push({ role: 'bot', content: data.data.response });
+                    } else {
+                        this.messages.push({ role: 'bot', content: '❌ Ups, hubo un error técnico: ' + data.error });
+                    }
+                } catch (error) {
+                    this.messages.push({ role: 'bot', content: '❌ Error de conexión: ' + error.message });
+                } finally {
+                    this.loading = false;
+                    this.scrollToBottom();
+                    setTimeout(() => lucide.createIcons(), 50);
+                }
+            },
+            
+            scrollToBottom() {
+                setTimeout(() => {
+                    const container = document.getElementById('chat-messages');
+                    if(container) {
+                        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+                    }
+                }, 50);
+            }
+        }));
+    });
+</script>
 {% endblock %}

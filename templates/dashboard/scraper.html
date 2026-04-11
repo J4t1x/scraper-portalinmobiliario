@@ -2,12 +2,288 @@
 
 {% block title %}Scraper - Portal Inmobiliario Scraper{% endblock %}
 
+{% block extra_head %}
+<style>
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+    .status-running { background-color: #dcfce7; color: #166534; }
+    .status-stopped { background-color: #fee2e2; color: #991b1b; }
+    .status-paused { background-color: #fef3c7; color: #92400e; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="space-y-6">
+<div class="space-y-6" x-data="scraperControl()">
     <h1 class="text-3xl font-bold text-slate-900">Panel de Control del Scraper</h1>
     
+    <!-- Scheduler Status Card -->
     <div class="bg-white rounded-lg shadow p-6 border border-slate-200">
-        <p class="text-slate-600">El panel de control del scraper se implementará en la Fase 4</p>
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-semibold text-slate-900">Estado del Scheduler</h2>
+            <span class="status-badge" :class="schedulerStatusClass" x-text="schedulerStatus"></span>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="bg-slate-50 rounded-lg p-4">
+                <p class="text-sm text-slate-600">Jobs Configurados</p>
+                <p class="text-2xl font-bold text-slate-900" x-text="jobCount"></p>
+            </div>
+            <div class="bg-slate-50 rounded-lg p-4">
+                <p class="text-sm text-slate-600">Total Ejecuciones</p>
+                <p class="text-2xl font-bold text-slate-900" x-text="totalExecutions"></p>
+            </div>
+            <div class="bg-slate-50 rounded-lg p-4">
+                <p class="text-sm text-slate-600">Último Heartbeat</p>
+                <p class="text-sm font-semibold text-slate-900" x-text="lastHeartbeat"></p>
+            </div>
+        </div>
+        
+        <div class="flex gap-2">
+            <button @click="startScheduler" :disabled="schedulerRunning" 
+                    class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                Iniciar Scheduler
+            </button>
+            <button @click="pauseScheduler" :disabled="!schedulerRunning || schedulerPaused"
+                    class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                Pausar
+            </button>
+            <button @click="resumeScheduler" :disabled="!schedulerPaused"
+                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                Reanudar
+            </button>
+            <button @click="stopScheduler" :disabled="!schedulerRunning"
+                    class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                Detener
+            </button>
+            <button @click="refreshStatus" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700">
+                Actualizar
+            </button>
+        </div>
+    </div>
+    
+    <!-- Manual Scraping Card -->
+    <div class="bg-white rounded-lg shadow p-6 border border-slate-200">
+        <h2 class="text-xl font-semibold text-slate-900 mb-4">Ejecución Manual</h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Operación</label>
+                <select x-model="manualConfig.operacion" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option value="venta">Venta</option>
+                    <option value="arriendo">Arriendo</option>
+                    <option value="arriendo-temporada">Arriendo Temporada</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Tipo</label>
+                <select x-model="manualConfig.tipo" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option value="departamento">Departamento</option>
+                    <option value="casa">Casa</option>
+                    <option value="oficina">Oficina</option>
+                    <option value="terreno">Terreno</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Páginas Máx</label>
+                <input type="number" x-model="manualConfig.max_pages" min="1" max="100" 
+                       class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Formato</label>
+                <select x-model="manualConfig.formato" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option value="txt">TXT</option>
+                    <option value="json">JSON</option>
+                    <option value="csv">CSV</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="flex items-center gap-4 mb-4">
+            <label class="flex items-center gap-2">
+                <input type="checkbox" x-model="manualConfig.scrape_details" class="rounded text-blue-600">
+                <span class="text-sm text-slate-700">Scrapear detalles</span>
+            </label>
+            <label class="flex items-center gap-2">
+                <input type="checkbox" x-model="manualConfig.verbose" class="rounded text-blue-600">
+                <span class="text-sm text-slate-700">Verbose</span>
+            </label>
+        </div>
+        
+        <button @click="runManualScraping" :disabled="manualScraping"
+                class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+            <span x-show="!manualScraping">Ejecutar Scraping Manual</span>
+            <span x-show="manualScraping">Ejecutando...</span>
+        </button>
+        
+        <!-- Real-time Log Display -->
+        <div x-show="scrapingLogs.length > 0" class="mt-6">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-lg font-semibold text-slate-900">Logs en Tiempo Real</h3>
+                <span class="text-sm text-slate-600" x-text="`${scrapingLogs.length} líneas`"></span>
+            </div>
+            <div id="log-container" class="bg-slate-900 rounded-lg p-4 h-96 overflow-y-auto">
+                <template x-for="(log, index) in scrapingLogs" :key="index">
+                    <div class="text-sm font-mono mb-1">
+                        <span class="text-slate-500" x-text="formatLogTime(log.timestamp)"></span>
+                        <span class="text-green-400 ml-2" x-text="log.log"></span>
+                    </div>
+                </template>
+                <div x-show="scrapingLogs.length === 0" class="text-slate-500 text-sm">
+                    Esperando logs...
+                </div>
+            </div>
+        </div>
+        
+        <div x-show="manualResult && scrapingLogs.length === 0" class="mt-4 p-4 rounded-lg" :class="manualSuccess ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'">
+            <pre class="text-sm whitespace-pre-wrap" x-text="manualResult"></pre>
+        </div>
+    </div>
+    
+    <!-- Jobs List Card -->
+    <div class="bg-white rounded-lg shadow p-6 border border-slate-200">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-semibold text-slate-900">Jobs Configurados</h2>
+            <button @click="showAddJobForm = !showAddJobForm" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                Agregar Job
+            </button>
+        </div>
+        
+        <!-- Add Job Form -->
+        <div x-show="showAddJobForm" class="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
+            <h3 class="font-semibold text-slate-900 mb-4">Agregar Nuevo Job</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Operación</label>
+                    <select x-model="newJob.operacion" class="w-full px-3 py-2 border border-slate-300 rounded-lg">
+                        <option value="venta">Venta</option>
+                        <option value="arriendo">Arriendo</option>
+                        <option value="arriendo-temporada">Arriendo Temporada</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Tipo</label>
+                    <select x-model="newJob.tipo" class="w-full px-3 py-2 border border-slate-300 rounded-lg">
+                        <option value="departamento">Departamento</option>
+                        <option value="casa">Casa</option>
+                        <option value="oficina">Oficina</option>
+                        <option value="terreno">Terreno</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Tipo de Schedule</label>
+                    <select x-model="newJob.schedule_type" class="w-full px-3 py-2 border border-slate-300 rounded-lg">
+                        <option value="interval">Intervalo</option>
+                        <option value="cron">Cron</option>
+                    </select>
+                </div>
+                <div x-show="newJob.schedule_type === 'interval'">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Intervalo (horas)</label>
+                    <input type="number" x-model="newJob.hours" min="1" class="w-full px-3 py-2 border border-slate-300 rounded-lg">
+                </div>
+                <div x-show="newJob.schedule_type === 'cron'">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Hora (0-23)</label>
+                    <input type="number" x-model="newJob.hour" min="0" max="23" class="w-full px-3 py-2 border border-slate-300 rounded-lg">
+                </div>
+                <div x-show="newJob.schedule_type === 'cron'">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Minuto (0-59)</label>
+                    <input type="number" x-model="newJob.minute" min="0" max="59" class="w-full px-3 py-2 border border-slate-300 rounded-lg">
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button @click="addJob" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                    Agregar
+                </button>
+                <button @click="showAddJobForm = false" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+        
+        <!-- Jobs Table -->
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b border-slate-200">
+                        <th class="text-left py-3 px-4 font-semibold text-slate-900">ID</th>
+                        <th class="text-left py-3 px-4 font-semibold text-slate-900">Nombre</th>
+                        <th class="text-left py-3 px-4 font-semibold text-slate-900">Trigger</th>
+                        <th class="text-left py-3 px-4 font-semibold text-slate-900">Próxima Ejecución</th>
+                        <th class="text-left py-3 px-4 font-semibold text-slate-900">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="job in jobs" :key="job.id">
+                        <tr class="border-b border-slate-100 hover:bg-slate-50">
+                            <td class="py-3 px-4 text-slate-700" x-text="job.id"></td>
+                            <td class="py-3 px-4 text-slate-700" x-text="job.name"></td>
+                            <td class="py-3 px-4 text-slate-700" x-text="job.trigger"></td>
+                            <td class="py-3 px-4 text-slate-700" x-text="formatDate(job.next_run_time)"></td>
+                            <td class="py-3 px-4">
+                                <div class="flex gap-2">
+                                    <button @click="pauseJob(job.id)" class="px-3 py-1 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700">
+                                        Pausar
+                                    </button>
+                                    <button @click="resumeJob(job.id)" class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
+                                        Reanudar
+                                    </button>
+                                    <button @click="removeJob(job.id)" class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700">
+                                        Eliminar
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+        
+        <div x-show="jobs.length === 0" class="text-center py-8 text-slate-500">
+            No hay jobs configurados
+        </div>
+    </div>
+    
+    <!-- Execution History Card -->
+    <div class="bg-white rounded-lg shadow p-6 border border-slate-200">
+        <h2 class="text-xl font-semibold text-slate-900 mb-4">Historial de Ejecuciones</h2>
+        
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b border-slate-200">
+                        <th class="text-left py-3 px-4 font-semibold text-slate-900">Job ID</th>
+                        <th class="text-left py-3 px-4 font-semibold text-slate-900">Inicio</th>
+                        <th class="text-left py-3 px-4 font-semibold text-slate-900">Estado</th>
+                        <th class="text-left py-3 px-4 font-semibold text-slate-900">Props Scrapeadas</th>
+                        <th class="text-left py-3 px-4 font-semibold text-slate-900">Páginas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="exec in executions" :key="exec.id">
+                        <tr class="border-b border-slate-100 hover:bg-slate-50">
+                            <td class="py-3 px-4 text-slate-700" x-text="exec.job_id"></td>
+                            <td class="py-3 px-4 text-slate-700" x-text="formatDate(exec.start_time)"></td>
+                            <td class="py-3 px-4">
+                                <span class="status-badge" :class="exec.status === 'success' ? 'status-running' : 'status-stopped'" x-text="exec.status"></span>
+                            </td>
+                            <td class="py-3 px-4 text-slate-700" x-text="exec.properties_scraped"></td>
+                            <td class="py-3 px-4 text-slate-700" x-text="exec.pages_processed"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+        
+        <div x-show="executions.length === 0" class="text-center py-8 text-slate-500">
+            No hay ejecuciones registradas
+        </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/scraper-control.js') }}"></script>
 {% endblock %}

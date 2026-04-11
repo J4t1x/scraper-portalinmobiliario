@@ -1,0 +1,463 @@
+{% extends "base.html" %}
+
+{% block title %}AI Analytics Studio - Portal Inmobiliario{% endblock %}
+
+{% block content %}
+<div class="h-[calc(100vh-8rem)] flex gap-4" x-data="aiAnalyticsStudio()">
+    
+    <!-- Main Chat Area -->
+    <div class="flex-1 flex flex-col min-w-0">
+        <!-- Header -->
+        <div class="mb-4 flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-slate-900 flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center">
+                        <i data-lucide="brain-circuit" class="text-white w-6 h-6"></i>
+                    </div>
+                    AI Analytics Studio
+                </h1>
+                <p class="text-slate-600 mt-1">Análisis inmobiliario potenciado por IA local</p>
+            </div>
+            
+            <!-- Model Status Badge -->
+            <div class="flex items-center gap-3">
+                <div class="px-4 py-2 rounded-xl border flex items-center gap-2" 
+                     :class="ollamaStatus === 'online' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'">
+                    <div class="w-2 h-2 rounded-full" 
+                         :class="ollamaStatus === 'online' ? 'bg-green-500 animate-pulse' : 'bg-red-500'"></div>
+                    <span class="text-sm font-medium" 
+                          :class="ollamaStatus === 'online' ? 'text-green-700' : 'text-red-700'"
+                          x-text="ollamaStatus === 'online' ? 'Ollama Online' : 'Ollama Offline'"></span>
+                </div>
+                <button @click="showSettings = !showSettings" 
+                        class="p-2 rounded-xl hover:bg-slate-100 transition-colors">
+                    <i data-lucide="settings" class="w-5 h-5 text-slate-600"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Chat Container -->
+        <div class="flex-1 bg-white rounded-2xl shadow-lg border border-slate-200 flex flex-col overflow-hidden">
+            
+            <!-- Messages Area -->
+            <div id="chat-messages" class="flex-1 overflow-y-auto p-6 space-y-6">
+                
+                <!-- Welcome Message -->
+                <div class="flex items-start gap-4 animate-fade-in">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center flex-shrink-0">
+                        <i data-lucide="sparkles" class="text-white w-5 h-5"></i>
+                    </div>
+                    <div class="flex-1">
+                        <div class="bg-gradient-to-br from-slate-50 to-blue-50 border border-slate-200 rounded-2xl rounded-tl-sm p-6 shadow-sm">
+                            <h3 class="font-semibold text-slate-900 mb-2 flex items-center gap-2">
+                                <i data-lucide="wand-2" class="w-4 h-4 text-blue-600"></i>
+                                ¡Bienvenido al AI Analytics Studio!
+                            </h3>
+                            <p class="text-slate-700 leading-relaxed mb-3">
+                                Soy tu asistente de analítica inmobiliaria potenciado por <span class="font-semibold text-blue-600">Ollama</span>. 
+                                He analizado el dataset completo de propiedades y puedo ayudarte con:
+                            </p>
+                            <div class="grid grid-cols-2 gap-2 text-sm">
+                                <div class="flex items-center gap-2 text-slate-600">
+                                    <i data-lucide="trending-up" class="w-4 h-4 text-green-600"></i>
+                                    Análisis de tendencias
+                                </div>
+                                <div class="flex items-center gap-2 text-slate-600">
+                                    <i data-lucide="map-pin" class="w-4 h-4 text-blue-600"></i>
+                                    Comparativas por zona
+                                </div>
+                                <div class="flex items-center gap-2 text-slate-600">
+                                    <i data-lucide="dollar-sign" class="w-4 h-4 text-yellow-600"></i>
+                                    Oportunidades de inversión
+                                </div>
+                                <div class="flex items-center gap-2 text-slate-600">
+                                    <i data-lucide="bar-chart-3" class="w-4 h-4 text-purple-600"></i>
+                                    Estadísticas avanzadas
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dynamic Messages -->
+                <template x-for="(msg, index) in messages" :key="index">
+                    <div class="flex items-start gap-4 animate-fade-in" :class="msg.role === 'user' ? 'flex-row-reverse' : ''">
+                        <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                             :class="msg.role === 'user' ? 'bg-slate-800' : 'bg-gradient-to-br from-blue-600 to-purple-600'">
+                            <i :data-lucide="msg.role === 'user' ? 'user' : 'sparkles'" class="text-white w-5 h-5"></i>
+                        </div>
+                        <div class="flex-1 max-w-[85%]">
+                            <div class="rounded-2xl p-4 shadow-sm"
+                                 :class="msg.role === 'user' ? 'bg-slate-800 text-white rounded-tr-sm' : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm'">
+                                <div class="prose prose-sm max-w-none" 
+                                     :class="msg.role === 'user' ? 'prose-invert' : ''"
+                                     x-html="formatMessage(msg.content)"></div>
+                            </div>
+                            
+                            <!-- Metrics for AI responses -->
+                            <div x-show="msg.role === 'assistant' && msg.metrics" class="mt-2 flex items-center gap-3 text-xs text-slate-500">
+                                <div class="flex items-center gap-1" x-show="msg.metrics?.duration">
+                                    <i data-lucide="clock" class="w-3 h-3"></i>
+                                    <span x-text="msg.metrics?.duration + 'ms'"></span>
+                                </div>
+                                <div class="flex items-center gap-1" x-show="msg.metrics?.tokens">
+                                    <i data-lucide="hash" class="w-3 h-3"></i>
+                                    <span x-text="msg.metrics?.tokens + ' tokens'"></span>
+                                </div>
+                                <div class="flex items-center gap-1" x-show="msg.metrics?.model">
+                                    <i data-lucide="cpu" class="w-3 h-3"></i>
+                                    <span x-text="msg.metrics?.model"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                
+                <!-- Loading Indicator -->
+                <div class="flex items-start gap-4 animate-fade-in" x-show="loading" style="display: none;">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center flex-shrink-0">
+                        <i data-lucide="loader-2" class="text-white w-5 h-5 animate-spin"></i>
+                    </div>
+                    <div class="flex-1">
+                        <div class="bg-white border border-slate-200 rounded-2xl rounded-tl-sm p-4 shadow-sm">
+                            <div class="flex items-center gap-3">
+                                <div class="flex space-x-1.5">
+                                    <div class="w-2 h-2 rounded-full bg-blue-400 animate-bounce"></div>
+                                    <div class="w-2 h-2 rounded-full bg-blue-400 animate-bounce" style="animation-delay: 0.15s;"></div>
+                                    <div class="w-2 h-2 rounded-full bg-blue-400 animate-bounce" style="animation-delay: 0.3s;"></div>
+                                </div>
+                                <span class="text-sm text-slate-600">Analizando datos...</span>
+                            </div>
+                            <!-- Progress bar -->
+                            <div class="mt-3 h-1 bg-slate-100 rounded-full overflow-hidden">
+                                <div class="h-full bg-gradient-to-r from-blue-600 to-purple-600 animate-progress"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="p-4 bg-gradient-to-r from-slate-50 to-blue-50 border-t border-slate-200">
+                <form @submit.prevent="sendMessage" class="flex gap-3">
+                    <div class="flex-1 relative">
+                        <input type="text" x-model="inputText" 
+                               class="w-full rounded-xl border border-slate-300 pl-5 pr-12 py-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm"
+                               placeholder="Pregunta sobre el mercado inmobiliario..."
+                               :disabled="loading || ollamaStatus !== 'online'"
+                               autocomplete="off">
+                        <div class="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-slate-400" x-show="inputText.length > 0">
+                            <span x-text="inputText.length"></span>/500
+                        </div>
+                    </div>
+                    <button type="submit" 
+                            class="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4 rounded-xl flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+                            :disabled="loading || inputText.trim() === '' || ollamaStatus !== 'online'">
+                        <span x-show="!loading" class="font-medium">Analizar</span>
+                        <i data-lucide="send" class="w-5 h-5" x-show="!loading"></i>
+                        <i data-lucide="loader-2" class="w-5 h-5 animate-spin" x-show="loading" style="display: none;"></i>
+                    </button>
+                </form>
+                
+                <!-- Quick Actions -->
+                <div class="mt-3 flex gap-2 flex-wrap">
+                    <button @click="quickQuestion('¿Cuáles son las mejores oportunidades de inversión?')" 
+                            class="text-xs px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-slate-700">
+                        💎 Mejores oportunidades
+                    </button>
+                    <button @click="quickQuestion('¿Cuál es el precio promedio por m² en Las Condes?')" 
+                            class="text-xs px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-slate-700">
+                        📊 Precio por m²
+                    </button>
+                    <button @click="quickQuestion('Compara precios entre Providencia y Ñuñoa')" 
+                            class="text-xs px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-slate-700">
+                        🔄 Comparar zonas
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Sidebar - Ollama Control & Metrics -->
+    <div class="w-80 flex flex-col gap-4" x-show="showSettings" x-transition>
+        
+        <!-- Ollama Status Card -->
+        <div class="bg-white rounded-2xl shadow-lg border border-slate-200 p-5">
+            <h3 class="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                <i data-lucide="server" class="w-5 h-5 text-blue-600"></i>
+                Ollama Server
+            </h3>
+            
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-600">Estado</span>
+                    <div class="flex items-center gap-2">
+                        <div class="w-2 h-2 rounded-full" 
+                             :class="ollamaStatus === 'online' ? 'bg-green-500 animate-pulse' : 'bg-red-500'"></div>
+                        <span class="text-sm font-medium" 
+                              :class="ollamaStatus === 'online' ? 'text-green-700' : 'text-red-700'"
+                              x-text="ollamaStatus === 'online' ? 'Online' : 'Offline'"></span>
+                    </div>
+                </div>
+                
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-600">Modelo</span>
+                    <span class="text-sm font-mono text-slate-900" x-text="currentModel"></span>
+                </div>
+                
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-600">Puerto</span>
+                    <span class="text-sm font-mono text-slate-900">11434</span>
+                </div>
+                
+                <button @click="checkOllamaStatus" 
+                        class="w-full mt-2 px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium transition-colors flex items-center justify-center gap-2">
+                    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                    Verificar Estado
+                </button>
+            </div>
+        </div>
+
+        <!-- Session Metrics -->
+        <div class="bg-white rounded-2xl shadow-lg border border-slate-200 p-5">
+            <h3 class="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                <i data-lucide="activity" class="w-5 h-5 text-purple-600"></i>
+                Métricas de Sesión
+            </h3>
+            
+            <div class="space-y-4">
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs text-slate-600">Consultas</span>
+                        <span class="text-lg font-bold text-slate-900" x-text="sessionMetrics.queries"></span>
+                    </div>
+                    <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div class="h-full bg-blue-600 rounded-full" :style="`width: ${Math.min(sessionMetrics.queries * 10, 100)}%`"></div>
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs text-slate-600">Tokens Totales</span>
+                        <span class="text-lg font-bold text-slate-900" x-text="sessionMetrics.totalTokens.toLocaleString()"></span>
+                    </div>
+                    <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div class="h-full bg-purple-600 rounded-full" :style="`width: ${Math.min(sessionMetrics.totalTokens / 100, 100)}%`"></div>
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs text-slate-600">Latencia Promedio</span>
+                        <span class="text-lg font-bold text-slate-900" x-text="sessionMetrics.avgLatency + 'ms'"></span>
+                    </div>
+                    <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div class="h-full bg-green-600 rounded-full" :style="`width: ${Math.max(100 - sessionMetrics.avgLatency / 50, 0)}%`"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Available Models -->
+        <div class="bg-white rounded-2xl shadow-lg border border-slate-200 p-5">
+            <h3 class="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                <i data-lucide="package" class="w-5 h-5 text-orange-600"></i>
+                Modelos Disponibles
+            </h3>
+            
+            <div class="space-y-2">
+                <template x-for="model in availableModels" :key="model.name">
+                    <div class="p-3 rounded-lg border border-slate-200 hover:border-blue-300 transition-colors cursor-pointer"
+                         :class="model.name === currentModel ? 'bg-blue-50 border-blue-300' : 'bg-white'"
+                         @click="switchModel(model.name)">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="font-medium text-sm text-slate-900" x-text="model.name"></div>
+                                <div class="text-xs text-slate-500" x-text="model.size"></div>
+                            </div>
+                            <i data-lucide="check-circle" class="w-5 h-5 text-blue-600" x-show="model.name === currentModel"></i>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@keyframes fade-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes progress {
+    0% { width: 0%; }
+    50% { width: 100%; }
+    100% { width: 0%; }
+}
+
+.animate-fade-in {
+    animation: fade-in 0.3s ease-out;
+}
+
+.animate-progress {
+    animation: progress 2s ease-in-out infinite;
+}
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('aiAnalyticsStudio', () => ({
+            messages: [],
+            inputText: '',
+            loading: false,
+            showSettings: true,
+            ollamaStatus: 'checking',
+            currentModel: 'qwen2.5-coder:1.5b',
+            availableModels: [
+                { name: 'qwen2.5-coder:1.5b', size: '900MB' }
+            ],
+            sessionMetrics: {
+                queries: 0,
+                totalTokens: 0,
+                avgLatency: 0,
+                latencies: []
+            },
+
+            init() {
+                this.checkOllamaStatus();
+                // Check status every 30 seconds
+                setInterval(() => this.checkOllamaStatus(), 30000);
+            },
+
+            async checkOllamaStatus() {
+                try {
+                    const response = await fetch('http://localhost:11434/api/tags');
+                    if (response.ok) {
+                        this.ollamaStatus = 'online';
+                        const data = await response.json();
+                        if (data.models && data.models.length > 0) {
+                            this.availableModels = data.models.map(m => ({
+                                name: m.name,
+                                size: this.formatBytes(m.size)
+                            }));
+                        }
+                    } else {
+                        this.ollamaStatus = 'offline';
+                    }
+                } catch (error) {
+                    this.ollamaStatus = 'offline';
+                }
+                setTimeout(() => lucide.createIcons(), 50);
+            },
+
+            formatBytes(bytes) {
+                if (bytes === 0) return '0 B';
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+            },
+
+            formatMessage(text) {
+                if (typeof marked !== 'undefined') {
+                    marked.setOptions({
+                        breaks: true,
+                        gfm: true
+                    });
+                    return marked.parse(text);
+                }
+                return text.replace(/\n/g, '<br>');
+            },
+
+            quickQuestion(question) {
+                this.inputText = question;
+                this.sendMessage();
+            },
+
+            async sendMessage() {
+                const text = this.inputText.trim();
+                if (!text || this.loading || this.ollamaStatus !== 'online') return;
+
+                const startTime = Date.now();
+                
+                this.messages.push({ role: 'user', content: text });
+                this.inputText = '';
+                this.loading = true;
+                
+                this.scrollToBottom();
+
+                try {
+                    const response = await fetch('/api/v2/agent/chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-API-KEY': 'default-secret-key'
+                        },
+                        body: JSON.stringify({ question: text })
+                    });
+
+                    const data = await response.json();
+                    const duration = Date.now() - startTime;
+                    
+                    if (data.response) {
+                        // Estimate tokens (rough approximation)
+                        const tokens = Math.ceil((text.length + data.response.length) / 4);
+                        
+                        this.messages.push({ 
+                            role: 'assistant', 
+                            content: data.response,
+                            metrics: {
+                                duration: duration,
+                                tokens: tokens,
+                                model: this.currentModel
+                            }
+                        });
+
+                        // Update session metrics
+                        this.sessionMetrics.queries++;
+                        this.sessionMetrics.totalTokens += tokens;
+                        this.sessionMetrics.latencies.push(duration);
+                        this.sessionMetrics.avgLatency = Math.round(
+                            this.sessionMetrics.latencies.reduce((a, b) => a + b, 0) / this.sessionMetrics.latencies.length
+                        );
+                    } else {
+                        this.messages.push({ 
+                            role: 'assistant', 
+                            content: '❌ Error: ' + (data.error || 'No se pudo obtener respuesta') 
+                        });
+                    }
+                } catch (error) {
+                    this.messages.push({ 
+                        role: 'assistant', 
+                        content: '❌ Error de conexión: ' + error.message 
+                    });
+                } finally {
+                    this.loading = false;
+                    this.scrollToBottom();
+                    setTimeout(() => lucide.createIcons(), 50);
+                }
+            },
+            
+            switchModel(modelName) {
+                this.currentModel = modelName;
+                // In a real implementation, you would call an API to switch models
+                console.log('Switching to model:', modelName);
+            },
+            
+            scrollToBottom() {
+                setTimeout(() => {
+                    const container = document.getElementById('chat-messages');
+                    if(container) {
+                        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+                    }
+                }, 50);
+            }
+        }));
+    });
+</script>
+{% endblock %}
