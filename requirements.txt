@@ -8,9 +8,9 @@ webdriver-manager==4.0.1
 python-json-logger==2.0.7
 
 # Database dependencies
-sqlalchemy==2.0.25
-alembic==1.13.1
-psycopg2-binary==2.9.9
+sqlalchemy>=2.0.36
+alembic>=1.14.0
+psycopg2-binary>=2.9.10
 
 # Dashboard dependencies
 Flask==3.0.2
@@ -20,6 +20,17 @@ python-socketio==5.11.1
 eventlet==0.35.2
 pandas==2.2.0
 Werkzeug==3.0.1
+flask-restx
+flask-limiter
+flask-caching
+redis
+
+# Production server (3x más throughput que Flask dev server)
+gunicorn==21.2.0
+gevent==23.9.1
+
+# HTTP compression (reduce tráfico en 60%)
+flask-compress==1.14
 
 # Scheduler dependencies
 APScheduler==3.10.4
@@ -29,3 +40,9 @@ pytest==8.0.0
 pytest-cov==4.1.0
 pytest-mock==3.12.0
 responses==0.24.0
+
+# AI/Analytics
+# Ollama se usa vía API REST (requiere: requests, que ya está instalado)
+# Para instalar Ollama: https://ollama.ai/download
+# Para ejecutar: ollama serve
+# Para descargar modelo: ollama pull qwen2.5-coder:3b

@@ -149,15 +149,17 @@ def handle_scheduler_command(args):
     from scheduler import get_scheduler, shutdown_global_scheduler
     
     if args.scheduler_command == 'start':
-        from scheduler_jobs import setup_default_jobs
+        from scheduler_jobs import setup_default_jobs, setup_maintenance_jobs
         
         scheduler = get_scheduler()
         
         # Setup default jobs (SPEC-012)
         setup_default_jobs(scheduler)
+        # Setup maintenance jobs (SPEC-013)
+        setup_maintenance_jobs(scheduler)
         
         scheduler.start()
-        logger.info("Scheduler iniciado con jobs default (SPEC-012). Presiona Ctrl+C para detener.")
+        logger.info("Scheduler iniciado con jobs default (SPEC-012) y mantenimiento (SPEC-013). Presiona Ctrl+C para detener.")
         
         # Keep running until interrupted
         try:
@@ -273,11 +275,12 @@ def handle_scheduler_command(args):
             
     elif args.scheduler_command == 'setup-default':
         from scheduler import get_scheduler
-        from scheduler_jobs import setup_default_jobs
+        from scheduler_jobs import setup_default_jobs, setup_maintenance_jobs
         
         scheduler = get_scheduler()
         setup_default_jobs(scheduler)
-        logger.info("Jobs default configurados (SPEC-012):")
+        setup_maintenance_jobs(scheduler)
+        logger.info("Jobs default (SPEC-012) y mantenimiento (SPEC-013) configurados:")
         
         jobs = scheduler.get_jobs()
         for job in jobs:

@@ -56,6 +56,20 @@ def create_scraping_job(
                 verbose=True
             )
             
+            # TASK-015-04: Cautiously trigger cache invalidation
+            try:
+                import requests
+                import os
+                api_key = os.getenv('API_KEY', 'default-secret-key')
+                requests.delete(
+                    "http://localhost:5000/api/v2/cache/invalidate",
+                    headers={"X-API-KEY": api_key},
+                    timeout=2
+                )
+                logger.debug("Cache de la API invalidado automáticamente tras finalizado el scraper")
+            except Exception as e:
+                logger.debug(f"No fue posible auto-invalidar caché: {e}")
+            
             # Extract metrics from result for scheduler logging
             metrics = {
                 'properties_scraped': result.get('properties_scraped', 0) if isinstance(result, dict) else 0,
@@ -266,6 +280,130 @@ def create_cleanup_job(scheduler: ScraperScheduler, days_to_keep: int = 30) -> s
     
     logger.info(f"Created cleanup job: {job_id} (keep {days_to_keep} days)")
     return job_id
+
+
+def create_data_cleanup_job(scheduler: ScraperScheduler, days_to_keep: int = 90) -> str:
+    """
+    Create a job to clean up old output data files and obsolete entries.
+    SPEC-013-01
+    """
+    job_id = 'data_cleanup_job'
+    
+    def data_cleanup_wrapper():
+        import os
+        from datetime import datetime, timedelta
+        from config import Config
+        try:
+            logger.info(f"Starting cleanup of old data files (>{days_to_keep} days)")
+            cutoff_date = datetime.now() - timedelta(days=days_to_keep)
+            deleted_files = 0
+            
+            output_dir = getattr(Config, 'OUTPUT_DIR', 'output')
+            if os.path.exists(output_dir):
+                for filename in os.listdir(output_dir):
+                    filepath = os.path.join(output_dir, filename)
+                    if os.path.isfile(filepath):
+                        mtime = datetime.fromtimestamp(os.path.getmtime(filepath))
+                        if mtime < cutoff_date:
+                            os.remove(filepath)
+                            deleted_files += 1
+                            
+            logger.info(f"Data cleanup completed: {deleted_files} files deleted")
+            return {'deleted_files': deleted_files}
+        except Exception as e:
+            logger.error(f"Data cleanup failed: {e}")
+            raise
+
+    scheduler.add_job(
+        data_cleanup_wrapper,
+        job_id=job_id,
+        trigger='cron',
+        day_of_week='sun',
+        hour=2,
+        minute=0
+    )
+    logger.info(f"Created data cleanup job: {job_id}")
+    return job_id
+
+
+def create_log_maintenance_job(scheduler: ScraperScheduler) -> str:
+    """
+    Create a job to manually trigger log rotation or old log cleanup.
+    SPEC-013-02
+    """
+    job_id = 'log_maintenance_job'
+    
+    def log_maintenance_wrapper():
+        try:
+            logger.info("Starting log maintenance")
+            from logger_config import setup_logging
+            # Setup logging also calls clean_old_logs internally
+            log_config = setup_logging()
+            log_config.clean_old_logs()
+            logger.info("Log maintenance completed")
+            return {'status': 'success'}
+        except Exception as e:
+            logger.error(f"Log maintenance failed: {e}")
+            raise
+
+    scheduler.add_job(
+        log_maintenance_wrapper,
+        job_id=job_id,
+        trigger='cron',
+        hour=0,
+        minute=0
+    )
+    logger.info(f"Created log maintenance job: {job_id}")
+    return job_id
+
+
+def create_backup_job(scheduler: ScraperScheduler) -> str:
+    """
+    Create a job to backup outputs and db instances.
+    SPEC-013-03
+    """
+    job_id = 'backup_job'
+    
+    def backup_wrapper():
+        import os
+        import subprocess
+        from datetime import datetime
+        try:
+            logger.info("Starting backup job")
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            backup_dir = 'backups'
+            os.makedirs(backup_dir, exist_ok=True)
+            
+            # Backup output directory into a tarball
+            backup_filename = f"{backup_dir}/output_backup_{timestamp}.tar.gz"
+            if os.path.exists('output'):
+                subprocess.run(['tar', '-czf', backup_filename, 'output'], check=True)
+            
+            logger.info(f"Backup completed: {backup_filename}")
+            return {'backup_file': backup_filename}
+        except Exception as e:
+            logger.error(f"Backup job failed: {e}")
+            raise
+
+    scheduler.add_job(
+        backup_wrapper,
+        job_id=job_id,
+        trigger='cron',
+        day_of_week='sun',
+        hour=4,
+        minute=0
+    )
+    logger.info(f"Created backup job: {job_id}")
+    return job_id
+
+
+def setup_maintenance_jobs(scheduler: ScraperScheduler) -> None:
+    """Register all maintenance jobs onto the scheduler."""
+    create_cleanup_job(scheduler)
+    create_data_cleanup_job(scheduler)
+    create_log_maintenance_job(scheduler)
+    create_backup_job(scheduler)
+    logger.info("Maintenance jobs setup completed")
 
 
 # Predefined job configurations (SPEC-012)

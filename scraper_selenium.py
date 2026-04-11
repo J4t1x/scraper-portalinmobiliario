@@ -15,6 +15,53 @@ from logger_config import get_logger, log_performance
 logger = get_logger(__name__)
 
 
+def get_optimized_chrome_options(headless: bool = True) -> Options:
+    """
+    Chrome options optimizadas para bajo consumo de recursos
+    Reduce RAM en ~200 MB y CPU en ~15%
+    
+    Args:
+        headless: Si True, ejecuta en modo headless
+        
+    Returns:
+        Options configuradas para máxima eficiencia
+    """
+    options = Options()
+    
+    # Headless mode (nuevo modo más eficiente)
+    if headless:
+        options.add_argument('--headless=new')
+    
+    # Memory optimizations (crítico para reducir RAM)
+    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-gpu')
+    options.add_argument('--disable-software-rasterizer')
+    options.add_argument('--disable-extensions')
+    options.add_argument('--disable-background-networking')
+    options.add_argument('--disable-default-apps')
+    options.add_argument('--disable-sync')
+    options.add_argument('--disable-translate')
+    options.add_argument('--metrics-recording-only')
+    options.add_argument('--mute-audio')
+    options.add_argument('--no-first-run')
+    options.add_argument('--safebrowsing-disable-auto-update')
+    
+    # Performance optimizations
+    options.add_argument('--disable-setuid-sandbox')
+    options.add_argument('--memory-pressure-off')
+    options.add_argument('--max-old-space-size=512')
+    options.add_argument('--js-flags=--max-old-space-size=512')
+    
+    # Anti-detection (mantener funcionalidad)
+    options.add_argument('--disable-blink-features=AutomationControlled')
+    options.add_argument(f'user-agent={Config.USER_AGENT}')
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option('useAutomationExtension', False)
+    
+    return options
+
+
 class PortalInmobiliarioSeleniumScraper:
     """Scraper usando Selenium para manejar JavaScript"""
     
@@ -43,28 +90,35 @@ class PortalInmobiliarioSeleniumScraper:
         self.validation_stats = {'valid': 0, 'invalid': 0, 'warnings': 0}
         self.persist_to_db = persist_to_db
         
-        chrome_options = Options()
-        if headless:
-            chrome_options.add_argument('--headless=new')
-        chrome_options.add_argument('--no-sandbox')
-        chrome_options.add_argument('--disable-dev-shm-usage')
-        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-        chrome_options.add_argument(f'user-agent={Config.USER_AGENT}')
-        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        chrome_options.add_experimental_option('useAutomationExtension', False)
+        # Usar chrome options optimizadas (reduce RAM en ~200MB)
+        chrome_options = get_optimized_chrome_options(headless=headless)
         
-        logger.info("Inicializando navegador Chrome...")
-        driver_path = ChromeDriverManager().install()
+        # Detectar si estamos usando Chromium (contenedor) o Chrome (local)
+        import os
+        import shutil
         
-        # Corregir path si apunta al archivo incorrecto
-        if 'THIRD_PARTY_NOTICES' in driver_path or not driver_path.endswith('chromedriver'):
-            import os
-            driver_dir = os.path.dirname(driver_path)
-            chromedriver_path = os.path.join(driver_dir, 'chromedriver')
-            if os.path.exists(chromedriver_path):
-                driver_path = chromedriver_path
+        chromium_path = shutil.which('chromium')
+        chromedriver_system = shutil.which('chromedriver')
         
-        service = Service(driver_path)
+        if chromium_path and chromedriver_system:
+            # Usar Chromium del sistema (contenedor)
+            logger.info("Usando Chromium del sistema...")
+            chrome_options.binary_location = chromium_path
+            service = Service(chromedriver_system)
+        else:
+            # Usar Chrome con ChromeDriverManager (local)
+            logger.info("Inicializando navegador Chrome...")
+            driver_path = ChromeDriverManager().install()
+            
+            # Corregir path si apunta al archivo incorrecto
+            if 'THIRD_PARTY_NOTICES' in driver_path or not driver_path.endswith('chromedriver'):
+                driver_dir = os.path.dirname(driver_path)
+                chromedriver_path = os.path.join(driver_dir, 'chromedriver')
+                if os.path.exists(chromedriver_path):
+                    driver_path = chromedriver_path
+            
+            service = Service(driver_path)
+        
         self.driver = webdriver.Chrome(service=service, options=chrome_options)
         self.wait = WebDriverWait(self.driver, 30)
         

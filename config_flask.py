@@ -18,3 +18,6 @@ class FlaskConfig:
     
     SOCKETIO_ASYNC_MODE = "threading"
     SOCKETIO_CORS_ALLOWED_ORIGINS = "*"
+    
+    OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+    OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:3b")

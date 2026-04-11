@@ -14,9 +14,11 @@ __pycache__/
 
 # Output files (se generan en runtime)
 output/
-*.txt
 *.json
 *.csv
+
+# IMPORTANTE: NO ignorar requirements.txt
+!requirements.txt
 
 # IDE
 .vscode/
