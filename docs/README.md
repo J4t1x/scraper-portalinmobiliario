@@ -1,56 +1,73 @@
 # 📚 Documentación — Portal Inmobiliario Scraper
 
-**Última actualización:** 9 Abril 2026
+**Última actualización:** 11 Abril 2026  
+**Versión:** 2.0.0-MVP Analytics  
+**Estado:** ✅ MVP Implementado + 🚧 Optimización en progreso
 
 ---
 
-## � Índice de Documentación
+## 📊 Índice de Documentación
 
 ### 🎯 Documentación Principal
-- [**ARCHITECTURE**](ARCHITECTURE.md) — Arquitectura del sistema
+- [**ARCHITECTURE**](ARCHITECTURE.md) — Arquitectura del sistema (scraper + analytics + IA)
+- [**MVP-ARCHITECTURE**](MVP-ARCHITECTURE.md) — Arquitectura MVP (contenedor único)
 - [**STATUS**](STATUS.md) — Estado actual del proyecto
-- [**CONVENTIONS**](CONVENTIONS.md) — Convenciones de código
-- [**ORGANIZATION**](ORGANIZATION.md) — Organización de la documentación
+- [**CONVENTIONS**](CONVENTIONS.md) — Convenciones de código y estilo
 - [**LOGGING**](LOGGING.md) — Sistema de logging
 
-### 📖 Guías
+### 📖 Guías de Uso
 - [**QUICKSTART**](guides/QUICKSTART.md) — Guía de inicio rápido (5 minutos)
+- [**MVP-QUICKSTART**](MVP-QUICKSTART.md) — Inicio rápido del contenedor MVP
 
-### � Deployment
-- [**Docker**](deployment/DOCKER.md) — Guía completa de Docker y Railway
-- [**Docker Quickstart**](deployment/QUICKSTART-DOCKER.md) — Docker en 5 minutos
-- [**Railway**](deployment/RAILWAY.md) — Deployment en Railway
+### 🚀 Deployment
+- [**DOCKER**](deployment/DOCKER.md) — Guía completa de Docker (estándar)
+- [**QUICKSTART-DOCKER**](deployment/QUICKSTART-DOCKER.md) — Docker en 5 minutos
+- [**DEPLOYMENT-SUMMARY**](deployment/DEPLOYMENT-SUMMARY.md) — Resumen de deployment
 
-### � Especificaciones
-- [**PRD**](specs/prd.md) — Product Requirements Document
+### 🤖 Integraciones IA
+- [**AI-ANALYTICS-STUDIO**](AI-ANALYTICS-STUDIO.md) — Dashboard de analítica con IA
+- [**OLLAMA-INTEGRATION**](OLLAMA-INTEGRATION.md) — Integración con Ollama
+
+### 📋 Especificaciones y PRDs
+- [**PRD Original**](specs/prd.md) — Product Requirements Document inicial
+- [**SPEC-MVP-001**](specs/SPEC-MVP-001.md) — Especificación MVP Analytics completa
+- [**PRD Optimización Contenedor**](specs/PRD-OPTIMIZACION-CONTENEDOR.md) — Optimización de recursos (nuevo)
+- [**SPECS-RESUMEN**](specs/SPECS-RESUMEN.md) — Resumen de todas las specs
 - [**Roadmap Completo**](ROADMAP-COMPLETO.md) — Roadmap detallado del proyecto
 
-### 🔄 Migración
+### 🔄 Migración y Mantenimiento
 - [**Migration Guide**](migration/MIGRATION-GUIDE.md) — Guía de migración a PostgreSQL
-- [**Deployment Summary**](deployment/DEPLOYMENT-SUMMARY.md) — Resumen de deployment
+- [**ORGANIZATION**](ORGANIZATION.md) — Organización de la documentación
 
 ---
 
 ## 📰 Cambios Recientes
 
-### 9 Abril 2026 - Scheduler Automatizado (SPEC-011 y SPEC-012)
-- ✅ Completado SPEC-011: Scheduler con APScheduler
-  - Job store PostgreSQL para persistencia
-  - Concurrency control (max 3 jobs simultáneos)
-  - Event listeners para tracking en tiempo real
-  - Heartbeat monitoring y recuperación automática
-  - API REST para control remoto (16 endpoints)
-- ✅ Completado SPEC-012: Jobs de scraping automático
-  - 5 jobs preconfigurados (venta/arriendo departamento/casa/oficina)
-  - Schedules: diario (02:00-05:00 AM) y semanal (lunes 06:00 AM)
-  - Integración con PostgreSQL para logging de ejecuciones
-  - CLI commands: `--scheduler start/stop/status/list-jobs/add-job/remove-job`
-- 📄 Actualizada documentación: STATUS.md, README.md, ARCHITECTURE.md
+### 11 Abril 2026 - PRD Optimización de Contenedor
+- 📋 Creado PRD completo para optimización de recursos
+- 🎯 11 optimizaciones críticas identificadas
+- 📊 Objetivo: -45% tamaño imagen, -45% RAM, -50% costos
+- 📅 Plan de implementación: 6 días (4 fases)
+- 💰 ROI estimado: 11 meses, ahorro $72 USD/año
 
-### 7 Abril 2026 - Scraping de Detalle
-- ✅ Implementado scraping de página de detalle completo
-- ✅ Extracción de 15+ campos adicionales (descripción, características, publicador, imágenes, coordenadas GPS, fecha)
-- ✅ Integración en exportación (JSON, CSV)
+### 9 Abril 2026 - MVP Analytics Completado
+- ✅ Implementado SPEC-MVP-ANALYTICS-001 completo
+  - Pipeline pandas para analítica (precio/m², promedios por comuna)
+  - Detección de oportunidades (< μ - 1σ)
+  - Scoring 0-100 para oportunidades
+  - Modelos: Opportunity, AnalyticsCache
+  - API REST: /api/analytics/*, /api/opportunities/*
+  - Agente IA con Ollama (qwen2.5-coder:1.5b)
+- ✅ Contenedor MVP único (Dockerfile.mvp)
+  - PostgreSQL + Ollama + Flask + Scheduler
+  - Supervisord para orquestación
+  - Modelo IA pre-descargado
+- ✅ Migración Alembic 003 (tablas analytics)
+
+### 9 Abril 2026 - Dashboard y Scheduler
+- ✅ SPEC-011: Scheduler con APScheduler
+- ✅ SPEC-012: Jobs de scraping automático
+- ✅ SPEC-MVP-001/002/003: Dashboard con lectura de JSON
 
 ---
 
@@ -64,24 +81,41 @@ Esta carpeta contiene toda la documentación del proyecto **Portal Inmobiliario 
 
 ```
 docs/
-├── README.md                      # Este archivo (índice maestro)
-├── ARCHITECTURE.md                # Arquitectura del sistema
-├── STATUS.md                      # Estado actual del proyecto
-├── CONVENTIONS.md                 # Convenciones de código
-├── ORGANIZATION.md                # Organización de la documentación
-├── ROADMAP-COMPLETO.md            # Roadmap detallado
-├── guides/                        # Guías de uso
-│   └── QUICKSTART.md              # Inicio rápido
-├── deployment/                    # Guías de deployment
-│   ├── DOCKER.md                  # Docker completo
-│   ├── QUICKSTART-DOCKER.md       # Docker rápido
-│   └── RAILWAY.md                 # Railway
-└── specs/                         # Especificaciones
-    ├── prd.md                     # Product Requirements
-    ├── scraping-detail.md         # Spec de scraping de detalle
-    ├── dashboard-web.md           # Spec de dashboard web
-    ├── postgresql-integration.md  # Spec de PostgreSQL
-    └── api-rest.md                # Spec de API REST
+├── README.md                           # Este archivo (índice maestro)
+│
+├── 🎯 Core Documentation
+│   ├── ARCHITECTURE.md                 # Arquitectura general del sistema
+│   ├── MVP-ARCHITECTURE.md             # Arquitectura MVP (contenedor único)
+│   ├── STATUS.md                       # Estado actual del proyecto
+│   ├── CONVENTIONS.md                  # Convenciones de código
+│   ├── LOGGING.md                      # Sistema de logging
+│   ├── ROADMAP-COMPLETO.md             # Roadmap detallado
+│   └── ORGANIZATION.md                 # Organización de docs
+│
+├── 🤖 AI & Analytics
+│   ├── AI-ANALYTICS-STUDIO.md          # Dashboard de analítica con IA
+│   └── OLLAMA-INTEGRATION.md           # Integración Ollama
+│
+├── 📖 Guides
+│   ├── QUICKSTART.md                   # Inicio rápido general
+│   └── MVP-QUICKSTART.md               # Inicio rápido MVP
+│
+├── 🚀 Deployment
+│   ├── DOCKER.md                       # Guía completa Docker
+│   ├── QUICKSTART-DOCKER.md            # Docker en 5 minutos
+│   └── DEPLOYMENT-SUMMARY.md           # Resumen de deployment
+│
+├── 📋 Specs & PRDs
+│   ├── prd.md                          # PRD original
+│   ├── SPEC-MVP-001.md                 # Spec MVP Analytics completa
+│   ├── PRD-OPTIMIZACION-CONTENEDOR.md  # PRD Optimización (nuevo)
+│   ├── PRD-FASE-2-MEJORAS.md           # Fase 2
+│   ├── PRD-FASE-3-PRO.md               # Fase 3
+│   ├── PRD-FASE-4-ESCALAMIENTO.md      # Fase 4
+│   └── SPECS-RESUMEN.md                # Resumen de specs
+│
+└── 🔄 Migration
+    └── MIGRATION-GUIDE.md              # Guía de migración PostgreSQL
 ```
 
 ---
@@ -117,23 +151,25 @@ Si es tu primera vez con el proyecto:
 
 ---
 
-## 🤖 AI Dev Engine
+## 🤖 AI Dev Engine & Cascade
 
-Este proyecto está integrado con el **AI Dev Engine** para desarrollo automatizado:
+Este proyecto está integrado con **Cascade** y el **AI Dev Engine** para desarrollo automatizado:
 
 ### Workflows Disponibles
-- `/cascade-dev-scraper` — Desarrollo automatizado con SDD
+- `/cascade-dev-scraper` — Desarrollo automatizado con SDD + AI Engine
+- `/portalinmobiliario-dev` — Setup y ejecución local del scraper
+- `/portalinmobiliario-github` — Subida a GitHub con Conventional Commits
+- `/portalinmobiliario-mvp` — Implementar MVP de analítica (contenedor único)
 - `/engine-validate` — Validación completa (tests, lint, security)
-- `/engine-observe` — Monitoreo de producción
-- `/portalinmobiliario-dev` — Workflow de desarrollo local
-- `/portalinmobiliario-github` — Subida a GitHub
+- `/engine-observe` — Monitoreo de producción y logs
 
 ### Agentes Especializados
-- **Scraper Agent** — Desarrollo de scrapers
-- **Data Agent** — Validación y exportación de datos
+- **Scraper Agent** — Desarrollo de scrapers con Selenium
+- **Data Agent** — Validación, transformación y exportación
+- **Analytics Agent** — Pipeline pandas y detección de oportunidades
 - **Test Agent** — Testing automatizado
 
-Ver `.windsurf/` para más detalles.
+Ver `.windsurf/` para configuración completa.
 
 ---
 
@@ -158,26 +194,43 @@ Para contribuir a la documentación:
 
 ---
 
-**Última revisión:** Abril 2026
+**Última revisión:** 11 Abril 2026
 
-- **Repositorio:** GitHub (configurar URL)
-- **Deployment:** Railway (configurar URL)
-- **Documentación API:** Pendiente
+### Enlaces Útiles
+- **Repositorio:** GitHub - scraper-portalinmobiliario
+- **Deployment:** Railway (configurar URL post-optimización)
+- **Dashboard Local:** http://localhost:5000 (después de `docker-compose up`)
+- **Ollama API:** http://localhost:11434 (dentro del contenedor MVP)
+- **Documentación API:** Ver `AI-ANALYTICS-STUDIO.md`
+
+### Stack Tecnológico
+- **Scraping:** Python 3.14.3 + Selenium 4.18.1 + Chrome headless
+- **Base de datos:** PostgreSQL 15 + SQLAlchemy + Alembic
+- **Analytics:** pandas + numpy + scikit-learn (básico)
+- **IA:** Ollama + qwen2.5-coder:1.5b (1.5B parámetros)
+- **Web:** Flask 3.0.2 + TailwindCSS + Chart.js
+- **Scheduler:** APScheduler + Supervisor
+- **Container:** Docker + docker-compose
 
 ## 📝 Convenciones
 
 ### Commits
 Seguir **Conventional Commits**:
-- `feat(scope): descripción`
-- `fix(scope): descripción`
-- `docs: descripción`
+- `feat(scope): descripción` — Nueva funcionalidad
+- `fix(scope): descripción` — Corrección de bugs
+- `docs: descripción` — Cambios en documentación
+- `refactor(scope): descripción` — Refactorización
+- `perf(scope): descripción` — Mejoras de performance
+- `test(scope): descripción` — Tests
 
 Ver: [.windsurf/workflows/portalinmobiliario-github.md](../.windsurf/workflows/portalinmobiliario-github.md)
 
 ### Estructura de Código
-- Python 3.11+
-- PEP 8 style guide
-- Type hints recomendados
+- **Python:** 3.14.3 (producción), 3.11+ (desarrollo)
+- **Style:** PEP 8 + Black formatter
+- **Type hints:** Obligatorios en funciones públicas
+- **Docstrings:** Google style
+- **Testing:** pytest + coverage > 70%
 
 ---
 

@@ -1,6 +1,8 @@
 # Estado del Proyecto — Portal Inmobiliario Scraper
 
-**Última actualización:** Abril 2026
+**Última actualización:** 11 Abril 2026  
+**Versión:** 2.0.0-MVP Analytics  
+**Fase:** ✅ MVP Completado + 🚧 Optimización en progreso
 
 ---
 
@@ -8,13 +10,14 @@
 
 | Aspecto | Estado | Detalles |
 |---------|--------|----------|
-| **Versión** | 2.0.0-MVP | Scraping + Dashboard con JSON |
-| **Estado** | 🚧 En desarrollo | MVP - Validación con cliente |
-| **Fuente de datos** | 📁 Archivos JSON | Carpeta `output/` |
-| **PostgreSQL** | ⏳ Pendiente | Post-MVP (validación exitosa) |
-| **Cobertura de tests** | ✅ Completada | 73% (Python 3.14: excluye módulos SQLAlchemy por incompatibilidad) |
-| **Documentación** | 🔄 Actualizando | README + docs/ |
-| **Specs completadas** | 12/39 (31%) | Fase MVP: Dashboard con JSON |
+| **Versión** | 2.0.0-MVP Analytics | Scraping + Analytics + IA |
+| **Estado** | ✅ MVP Completado | Contenedor único funcional |
+| **Base de datos** | ✅ PostgreSQL 15 | SQLAlchemy + Alembic |
+| **Analytics** | ✅ Implementado | pandas + detección oportunidades |
+| **IA** | ✅ Ollama integrado | qwen2.5-coder:1.5b |
+| **Cobertura de tests** | 73% | Python 3.14 (limitaciones SQLAlchemy) |
+| **Documentación** | ✅ Actualizada | README + docs/ reorganizado |
+| **Specs completadas** | 15/39 (38%) | MVP Analytics + PRD Optimización |
 
 ---
 
@@ -69,7 +72,7 @@
 - [x] Logging detallado
 - [x] Help completo
 
-### 🚧 Dashboard Web (MVP)
+### ✅ Dashboard Web (MVP Completado)
 - [x] Interfaz Flask básica
 - [x] Autenticación (Admin/Viewer)
 - [x] **Lectura de archivos JSON desde output/** (data_loader.py)
@@ -85,10 +88,28 @@
 - [x] **Gráficos simples (Chart.js)** - distribución por operación, tipo, top comunas (SPEC-MVP-003)
 - [x] **Búsqueda por texto** (SPEC-MVP-003)
 - [x] Control del scraper (CLI)
+- [x] **AI Analytics Studio** - Chat con IA para analítica
 - [ ] Logs en tiempo real (WebSocket) - Post-MVP
 - [ ] Analytics avanzado - Post-MVP
 
-### ⏳ Scheduler Automatizado (Post-MVP)
+### ✅ Analytics & Oportunidades (MVP Completado)
+- [x] Pipeline pandas para analítica (SPEC-MVP-ANALYTICS-001)
+- [x] Cálculo de precio/m² por propiedad
+- [x] Promedios por comuna (precio, precio/m²)
+- [x] Detección de oportunidades (< μ - 1σ)
+- [x] Scoring 0-100 para oportunidades
+- [x] Modelos: Opportunity, AnalyticsCache
+- [x] API REST: /api/analytics/*, /api/opportunities/*
+- [x] Agente IA con Ollama (qwen2.5-coder:1.5b)
+- [x] Contenedor MVP único (Dockerfile.mvp)
+  - PostgreSQL + Ollama + Flask + Scheduler
+  - Supervisord para orquestación
+  - Modelo IA pre-descargado
+- [x] Migración Alembic 003 (tablas analytics)
+- [ ] Dashboard de oportunidades - Post-Optimización
+- [ ] Notificaciones automáticas - Post-Optimización
+
+### ✅ Scheduler Automatizado (Implementado)
 - [x] APScheduler configurado (SPEC-011)
 - [x] Jobs periódicos (interval, cron)
 - [x] Manejo de concurrencia (max 3 jobs)
@@ -129,15 +150,24 @@
 - [ ] Tests E2E
 - [ ] CI/CD con GitHub Actions
 
-### 🚧 Documentación
+### ✅ Documentación (Actualizada)
 - [x] README completo
-- [x] docs/README.md (índice)
+- [x] docs/README.md (índice reorganizado)
 - [x] docs/ARCHITECTURE.md
+- [x] docs/MVP-ARCHITECTURE.md
 - [x] docs/STATUS.md (este archivo)
-- [ ] docs/CONVENTIONS.md
+- [x] docs/CONVENTIONS.md
+- [x] docs/LOGGING.md
+- [x] docs/AI-ANALYTICS-STUDIO.md
+- [x] docs/OLLAMA-INTEGRATION.md
 - [x] docs/deployment/DOCKER.md
+- [x] docs/deployment/DEPLOYMENT-SUMMARY.md
 - [x] docs/guides/QUICKSTART.md
+- [x] docs/MVP-QUICKSTART.md
 - [x] docs/specs/prd.md
+- [x] docs/specs/SPEC-MVP-001.md
+- [x] docs/specs/PRD-OPTIMIZACION-CONTENEDOR.md (nuevo)
+- [x] docs/specs/SPECS-RESUMEN.md
 - [x] docs/migration/MIGRATION-GUIDE.md
 
 ---
@@ -159,25 +189,41 @@
 
 ## 🚀 Próximas Prioridades
 
-### 🎯 MVP - Fase Actual (1-2 semanas)
-1. [ ] **Dashboard: Lector de archivos JSON desde output/**
-2. [ ] **Dashboard: Tabla interactiva de propiedades**
-3. [ ] **Dashboard: Filtros básicos (operación, tipo, rango de precio)**
-4. [ ] **Dashboard: Vista de detalle de propiedad**
-5. [ ] **Dashboard: KPIs básicos (totales, promedios)**
-6. [ ] **Dashboard: Gráficos simples (Chart.js o similar)**
-7. [ ] **Dashboard: Búsqueda por texto (título, ubicación)**
-8. [ ] **Validación con cliente usando datos reales del scraper**
+### 🎯 Optimización de Contenedor - Fase Actual (6 días)
+**PRD:** `docs/specs/PRD-OPTIMIZACION-CONTENEDOR.md`
 
-### Post-MVP - Fase 2 (después de validación)
-1. [ ] Migración a PostgreSQL
-2. [ ] Scheduler automatizado con persistencia en BD
-3. [ ] API REST con FastAPI
-4. [ ] Analytics avanzado
-5. [ ] Logs en tiempo real (WebSocket)
-6. [ ] Cache de resultados
-7. [ ] Tests de integración (requiere Python 3.11/3.12)
-8. [ ] CI/CD con GitHub Actions
+#### Fase 1: Quick Wins (Día 1 - 4 horas)
+1. [ ] Implementar Chrome headless optimizado (-200 MB RAM)
+2. [ ] Configurar PostgreSQL tuning (-150 MB RAM)
+3. [ ] Agregar log rotation (prevención)
+4. [ ] Migrar a Gunicorn (+200% throughput)
+
+#### Fase 2: Refactoring (Día 2-3 - 8 horas)
+5. [ ] Crear Dockerfile multi-stage (-500 MB imagen)
+6. [ ] Migrar a Chromium (-200 MB imagen)
+7. [ ] Implementar Redis cache (-75% latencia)
+8. [ ] Agregar Flask-Compress (-60% tráfico)
+9. [ ] Implementar Lazy Ollama (-1.2 GB RAM idle)
+
+#### Fase 3: Arquitectura Modular (Día 4-5 - 8 horas)
+10. [ ] Migrar a Alpine Linux (-100 MB imagen)
+11. [ ] Crear docker-compose profiles (flexibilidad)
+12. [ ] Separar servicios core/optional (modularidad)
+
+#### Fase 4: Testing y Deploy (Día 6 - 4 horas)
+13. [ ] Load testing y validación
+14. [ ] Deploy a staging
+15. [ ] Deploy a producción
+
+**Objetivo:** -45% tamaño imagen, -45% RAM, -50% costos ($12/mes → $6/mes)
+
+### Post-Optimización - Fase 2
+1. [ ] Dashboard de oportunidades (visualización)
+2. [ ] Notificaciones automáticas de oportunidades
+3. [ ] API REST con FastAPI (migración desde Flask)
+4. [ ] Logs en tiempo real (WebSocket mejorado)
+5. [ ] Tests de integración (requiere Python 3.11/3.12)
+6. [ ] CI/CD con GitHub Actions
 
 ### Largo Plazo (3+ meses)
 1. [ ] Scraping distribuido con Celery
@@ -232,6 +278,20 @@
 ## 📝 Notas
 
 ### Cambios Recientes
+- **2026-04-11:** Creado PRD-OPTIMIZACION-CONTENEDOR.md
+  - 11 optimizaciones críticas identificadas
+  - Plan de implementación de 6 días (4 fases)
+  - Objetivo: -45% recursos, -50% costos
+  - ROI: 11 meses, ahorro $72 USD/año
+- **2026-04-11:** Reorganizada carpeta docs/
+  - Actualizado docs/README.md con nueva estructura
+  - Actualizado docs/STATUS.md con estado actual
+  - Categorización por tipo: Core, AI, Guides, Deployment, Specs
+- **2026-04-09:** Completado SPEC-MVP-ANALYTICS-001 - Analytics completo
+  - Pipeline pandas implementado
+  - Detección de oportunidades funcional
+  - Agente IA integrado con Ollama
+  - Contenedor MVP único con 4 servicios
 - **2026-04-09:** Completado SPEC-MVP-003 - Dashboard UI (Componentes de visualización)
   - Actualizado `templates/dashboard/index.html` con KPIs dinámicos y gráficos Chart.js
   - Implementado `static/js/dashboard.js` con integración completa de Chart.js
@@ -278,10 +338,13 @@
 
 ### Decisiones Técnicas
 - **Selenium vs requests:** Selenium elegido por sitio dinámico con JavaScript
-- **JSON vs PostgreSQL (MVP):** Archivos JSON elegidos para MVP rápido y validación con cliente
-- **PostgreSQL:** Planificado para Post-MVP (histórico de precios y búsquedas complejas)
-- **Railway:** Elegido para deployment futuro con Docker + PostgreSQL
+- **PostgreSQL:** Implementado en MVP para analytics y oportunidades
+- **Contenedor único vs microservicios:** Contenedor único para MVP (simplicidad), separación planificada post-optimización
+- **Ollama vs OpenAI:** Ollama elegido por privacidad, costo $0, y control total
+- **pandas vs Spark:** pandas suficiente para dataset pequeño (<10K propiedades)
+- **Railway:** Elegido para deployment con Docker + PostgreSQL
 - **Dashboard:** Flask + TailwindCSS + Chart.js para visualización simple y rápida
+- **Alpine vs Debian:** Migración a Alpine planificada en optimización (-100 MB)
 
 ### Lecciones Aprendidas
 - Selectores CSS son más estables que XPath
@@ -291,21 +354,31 @@
 
 ---
 
-## 🎯 Objetivos MVP (Abril 2026)
+## 🎯 Objetivos MVP (Abril 2026) - ✅ COMPLETADOS
 
 1. **✅ Scraper funcional:** Extracción de datos completa (básico + detalle)
-2. **🚧 Dashboard MVP:** Visualización de datos desde archivos JSON
-3. **🎯 Validación cliente:** Demostrar valor con datos reales
-4. **📊 KPIs básicos:** Totales, promedios, distribución por tipo/operación
-5. **🔍 Búsqueda y filtros:** Encontrar propiedades relevantes
+2. **✅ Dashboard MVP:** Visualización de datos desde archivos JSON
+3. **✅ Analytics:** Pipeline pandas + detección de oportunidades
+4. **✅ IA:** Agente Ollama integrado para interpretación
+5. **✅ Contenedor único:** PostgreSQL + Ollama + Flask + Scheduler
+6. **✅ KPIs básicos:** Totales, promedios, distribución por tipo/operación
+7. **✅ Búsqueda y filtros:** Encontrar propiedades relevantes
 
-## 🎯 Objetivos Post-MVP (Q2-Q3 2026)
+## 🎯 Objetivos Optimización (Abril 2026) - 🚧 EN PROGRESO
+
+1. **🚧 Recursos:** -45% tamaño imagen, -45% RAM
+2. **🚧 Costos:** -50% ($12/mes → $6/mes)
+3. **🚧 Performance:** +200% throughput (Gunicorn)
+4. **🚧 Arquitectura:** Servicios modulares con profiles
+5. **🚧 Cache:** Redis para -75% latencia
+
+## 🎯 Objetivos Post-Optimización (Q2-Q3 2026)
 
 1. **Calidad:** Coverage de tests > 80%
 2. **Performance:** Throughput > 100 props/hora
 3. **Confiabilidad:** Tasa de éxito > 98%
-4. **Features:** API REST funcional + PostgreSQL
-5. **Automatización:** Scraping programado diario con scheduler
+4. **Features:** Dashboard de oportunidades + notificaciones
+5. **Automatización:** Scraping programado con monitoreo avanzado
 
 ---
 

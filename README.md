@@ -1,18 +1,57 @@
-# 🏠 Portal Inmobiliario Scraper
+# 🏠 Portal Inmobiliario Scraper + Analytics MVP
 
-[![Estado](https://img.shields.io/badge/estado-funcional-brightgreen)](https://github.com)
+[![Estado](https://img.shields.io/badge/estado-mvp%20en%20desarrollo-yellow)](https://github.com)
 [![Python](https://img.shields.io/badge/python-3.14.3-blue)](https://www.python.org/)
 [![Última actualización](https://img.shields.io/badge/última%20actualización-abril%202026-orange)](https://github.com)
 
-Scraper automatizado en Python para extraer datos de propiedades desde [portalinmobiliario.com](https://www.portalinmobiliario.com)
+Sistema completo de scraping, analítica y detección de oportunidades inmobiliarias con IA integrada.
 
-## � Estado del Proyecto
+**🎯 MVP:** Scraper + Analítica (pandas) + Dashboard + Agente IA (Ollama) en un solo contenedor Docker.
 
-- ✅ **Última ejecución exitosa:** 7 de abril de 2026
-- ✅ **Propiedades scrapeadas:** 144+ propiedades en pruebas recientes
-- ✅ **Formatos soportados:** TXT (JSONL), JSON, CSV
-- ✅ **Entorno:** Python 3.14.3 + Selenium 4.18.1 + ChromeDriver 146.0.7680.165
-- ✅ **Workflow Cascade:** `/portalinmobiliario-dev` disponible
+## 📊 Estado del Proyecto
+
+### Fase Actual: MVP Analytics Implementado ✅
+
+- ✅ **Scraper funcional:** 144+ propiedades scrapeadas en pruebas
+- ✅ **Base de datos:** PostgreSQL con scheduler automatizado
+- ✅ **Dashboard web:** Flask + TailwindCSS + BI básico
+- ✅ **Analítica MVP:** Pipeline pandas + detección de oportunidades (SPEC-MVP-ANALYTICS-001)
+- ✅ **Agente IA:** Ollama integrado en contenedor con qwen2.5-coder:1.5b pre-descargado
+- ✅ **Contenedor único MVP:** PostgreSQL + Python + Chrome + Ollama + Supervisor
+- 🚧 **Testing:** Validación de pipeline completo pendiente
+
+### Servicios en Contenedor MVP
+
+El contenedor único incluye 4 servicios gestionados por Supervisor:
+1. **PostgreSQL** (priority 1) - Base de datos en puerto interno 5432
+2. **Ollama** (priority 5) - Servidor IA en puerto 11434 con modelo qwen2.5-coder:1.5b
+3. **Flask** (priority 10) - API REST en puerto 5000
+4. **Scheduler** (priority 20) - Jobs automatizados de scraping
+
+### Características Implementadas
+
+- ✅ **Scraping:** Selenium 4.18.1 + ChromeDriver 146.0.7680.165
+- ✅ **Persistencia:** PostgreSQL + SQLAlchemy + Alembic
+- ✅ **Scheduler:** APScheduler con jobs automatizados
+- ✅ **Dashboard:** Flask 3.0.2 con autenticación y BI
+- ✅ **Exportación:** TXT (JSONL), JSON, CSV
+- ✅ **Workflows Cascade:** `/portalinmobiliario-dev`, `/portalinmobiliario-github`
+
+### Implementaciones MVP Completadas
+
+- ✅ **Analítica con pandas:** Precio/m², promedios por comuna, detección de outliers
+- ✅ **Detección de oportunidades:** Propiedades bajo promedio (< μ - 1σ), scoring 0-100
+- ✅ **Agente IA ligero:** Chat con Ollama para interpretación de insights
+- ✅ **API de oportunidades:** Endpoints REST para consultar y ejecutar analítica
+- ✅ **Contenedor único:** Dockerfile.mvp con supervisord para múltiples procesos
+- ✅ **Modelos de datos:** Opportunity, AnalyticsCache + migración Alembic 003
+
+### Próximos Pasos (Post-MVP)
+
+- � **Dashboard de oportunidades:** Página web para visualización
+- 🔜 **Testing completo:** Tests unitarios y de integración
+- 🔜 **Separar PostgreSQL:** Migrar a contenedor independiente
+- 🔜 **Notificaciones:** Alertas de nuevas oportunidades
 
 ## �📋 Características
 
@@ -28,14 +67,19 @@ Scraper automatizado en Python para extraer datos de propiedades desde [portalin
 - ✅ **Deduplicación inteligente:** Detección de duplicados entre ejecuciones con O(1) lookup
 - ✅ **Workflow Cascade:** Automatización completa con `/portalinmobiliario-dev`
 
-### Dashboard Web (Nuevo)
+### Dashboard Web
 - ✅ **Interfaz Flask:** Dashboard web moderno con TailwindCSS
 - ✅ **Autenticación:** Sistema de login con roles (Admin/Viewer)
 - ✅ **Control del Scraper:** Ejecutar scraping desde la interfaz web
 - ✅ **Visualización de Datos:** Explorador de archivos JSON/CSV con tablas interactivas
 - ✅ **Business Intelligence:** Gráficos, KPIs y estadísticas descriptivas
+- ✅ **AI Analytics Studio:** Experiencia premium de analítica con IA
+  - Chat inteligente tipo ChatGPT con Ollama integrado
+  - Panel de control de servidor Ollama en tiempo real
+  - Métricas de ejecución (latencia, tokens, modelo)
+  - Gestión de modelos disponibles
+  - Preguntas rápidas predefinidas
 - ✅ **Logs en Tiempo Real:** WebSocket para monitoreo en vivo
-- 🚧 **En desarrollo:** Analytics avanzado y más features
 
 ## 🚀 Instalación
 
@@ -66,6 +110,23 @@ pip install -r requirements.txt
 cp .env.example .env
 # Editar .env si deseas cambiar configuraciones
 ```
+
+#### 5. Configurar Ollama (para Agente de Analítica IA)
+
+El dashboard incluye un agente de analítica con IA local usando Ollama:
+
+```bash
+# Instalar Ollama
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Iniciar servidor Ollama
+ollama serve
+
+# Descargar modelo (en otra terminal)
+ollama pull qwen2.5-coder:3b
+```
+
+**📖 Ver [docs/OLLAMA-INTEGRATION.md](docs/OLLAMA-INTEGRATION.md) para documentación completa de Ollama.**
 
 ### Opción 2: Docker 🐳 (Recomendado para Producción)
 
@@ -479,9 +540,9 @@ DATABASE_URL=postgresql://user:password@localhost:5432/scraper_db
 
 **📖 Ver [docs/migration/MIGRATION-GUIDE.md](docs/migration/MIGRATION-GUIDE.md) para guía completa de migración.**
 
-## �🗺️ Roadmap
+## 🗺️ Roadmap
 
-### ✅ Fase 1 - MVP (Completado - Abril 2026)
+### ✅ Fase 1 - Scraper Base (Completado - Abril 2026)
 - ✅ Scraper con Selenium (navegación real)
 - ✅ Exportación TXT/JSON/CSV funcional
 - ✅ Paginación automática con límites configurables
@@ -493,29 +554,56 @@ DATABASE_URL=postgresql://user:password@localhost:5432/scraper_db
 - ✅ Logging detallado con timestamps
 - ✅ Manejo robusto de errores
 
-### 📋 Fase 2 - Mejoras (Completada)
+### ✅ Fase 2 - Mejoras y Persistencia (Completada)
 - ✅ Extracción de atributos (dormitorios, baños, m²)
 - ✅ Scraping de página de detalle (descripción, características, publicador, imágenes, coordenadas GPS, fecha)
-- ✅ Tests unitarios con pytest (73% coverage, excluye módulos SQLAlchemy por incompatibilidad Python 3.14)
-- [ ] Logging a archivo rotativo
+- ✅ Tests unitarios con pytest (73% coverage)
 - ✅ Validación de datos extraídos
 - ✅ Detección de duplicados
+- ✅ Almacenamiento en PostgreSQL
+- ✅ Scheduler (APScheduler) para scraping automático
+- ✅ Dashboard web con Flask
 
-### 🚀 Fase 3 - Pro
-- [ ] Uso de API interna (JSON endpoints)
-- [x] Almacenamiento en PostgreSQL
-- [x] Scheduler (APScheduler) para scraping automático
-- [ ] Dashboard de monitoreo con métricas
-- [ ] Notificaciones de errores
-- [ ] Cache de resultados
+### 🚧 Fase 3 - MVP Analítica (En Desarrollo - Abril 2026)
+**Objetivo:** Sistema completo de analítica y detección de oportunidades en un solo contenedor
 
-### 🌟 Fase 4 - Escalamiento
+- 🚧 **Contenedor único:** PostgreSQL + Python + Chrome + Ollama
+- 🚧 **Analítica con pandas:**
+  - Cálculo de precio/m² automático
+  - Promedios y estadísticas por comuna
+  - Detección de outliers y tendencias
+- 🚧 **Detección de oportunidades:**
+  - Propiedades bajo promedio (< μ - 1σ)
+  - Scoring automático (0-100)
+  - Clasificación: excelente, muy buena, buena, moderada
+- 🚧 **Agente IA ligero:**
+  - Integración con Ollama (qwen2.5-coder:1.5b)
+  - Interpretación de insights en lenguaje natural
+  - Chat para consultas sobre oportunidades
+- 🚧 **Dashboard de oportunidades:**
+  - Visualización de top oportunidades
+  - Filtros por comuna, tipo, score
+  - Gráficos de precio/m² por comuna
+  - KPIs de inversión
+
+**📖 Ver [docs/MVP-ARCHITECTURE.md](docs/MVP-ARCHITECTURE.md) para arquitectura completa**  
+**📖 Ver [docs/specs/SPEC-MVP-001.md](docs/specs/SPEC-MVP-001.md) para especificación técnica**
+
+### 🚀 Fase 4 - Pro (Futuro)
+- [ ] Separar PostgreSQL en contenedor independiente
+- [ ] API REST completa (FastAPI)
+- [ ] Cache distribuido (Redis)
+- [ ] Notificaciones de oportunidades
+- [ ] Exportación de reportes PDF
+- [ ] Integración con WhatsApp/Telegram
+
+### 🌟 Fase 5 - Escalamiento (Futuro)
 - [ ] Scraping distribuido con Celery
-- [ ] API REST propia (FastAPI)
-- [ ] Dashboard analítico con visualizaciones
-- [ ] Alertas de oportunidades (precio, ubicación)
 - [ ] Machine Learning para predicción de precios
+- [ ] Análisis de series temporales
+- [ ] Clustering geográfico
 - [ ] Integración con otras plataformas inmobiliarias
+- [ ] Deployment en Kubernetes
 
 ## 📝 Licencia
 
@@ -535,16 +623,30 @@ Las contribuciones son bienvenidas. Por favor:
 
 Toda la documentación del proyecto está organizada en la carpeta `docs/`:
 
+### Documentación Principal
+
 - **[docs/README.md](docs/README.md)** - Índice maestro de documentación
+- **[docs/MVP-ARCHITECTURE.md](docs/MVP-ARCHITECTURE.md)** - 🆕 Arquitectura MVP completa
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Arquitectura técnica del sistema
+- **[docs/STATUS.md](docs/STATUS.md)** - Estado actual del proyecto
+- **[docs/CONVENTIONS.md](docs/CONVENTIONS.md)** - Convenciones de código
+
+### Guías y Deployment
+
 - **[docs/guides/QUICKSTART.md](docs/guides/QUICKSTART.md)** - Guía de inicio rápido
 - **[docs/deployment/DOCKER.md](docs/deployment/DOCKER.md)** - Guía completa de Docker
 - **[docs/deployment/QUICKSTART-DOCKER.md](docs/deployment/QUICKSTART-DOCKER.md)** - Docker rápido
+
+### Especificaciones
+
 - **[docs/specs/prd.md](docs/specs/prd.md)** - Product Requirements Document
+- **[docs/specs/SPEC-MVP-001.md](docs/specs/SPEC-MVP-001.md)** - 🆕 Especificación MVP Analítica
 
 ### Workflows Cascade
 
 - **`/portalinmobiliario-dev`** - Workflow completo de desarrollo (setup, scraping, testing)
 - **`/portalinmobiliario-github`** - Workflow para subir cambios a GitHub
+- **`/cascade-dev-scraper`** - 🆕 Desarrollo automatizado con SDD + AI Dev Engine
 
 ## 🔧 Stack Tecnológico
 
@@ -554,6 +656,7 @@ Toda la documentación del proyecto está organizada en la carpeta `docs/`:
 - **Parsing:** lxml 5.1.0
 - **Config:** python-dotenv 1.0.1
 - **Alternativa:** requests 2.31.0 (scraper.py)
+- **IA Local:** Ollama + qwen2.5-coder:3b (Agente de Analítica)
 - **Docker:** Dockerfile + docker-compose con PostgreSQL
 - **Deploy:** Railway-ready con railway.json
 - **Automatización:** Workflows Cascade en `.windsurf/`
