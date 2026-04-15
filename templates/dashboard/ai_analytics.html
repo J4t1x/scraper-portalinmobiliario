@@ -96,7 +96,11 @@
                             
                             <!-- Metrics for AI responses -->
                             <div x-show="msg.role === 'assistant' && msg.metrics" class="mt-2 flex items-center gap-3 text-xs text-slate-500">
-                                <div class="flex items-center gap-1" x-show="msg.metrics?.duration">
+                                <div class="flex items-center gap-1" x-show="msg.metrics?.cached" title="Respuesta desde caché">
+                                    <i data-lucide="zap" class="w-3 h-3 text-green-600"></i>
+                                    <span class="text-green-600 font-medium">Caché</span>
+                                </div>
+                                <div class="flex items-center gap-1" x-show="msg.metrics?.duration !== undefined">
                                     <i data-lucide="clock" class="w-3 h-3"></i>
                                     <span x-text="msg.metrics?.duration + 'ms'"></span>
                                 </div>
@@ -113,8 +117,8 @@
                     </div>
                 </template>
                 
-                <!-- Loading Indicator -->
-                <div class="flex items-start gap-4 animate-fade-in" x-show="loading" style="display: none;">
+                <!-- Streaming Indicator -->
+                <div class="flex items-start gap-4 animate-fade-in" x-show="streaming" style="display: none;">
                     <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center flex-shrink-0">
                         <i data-lucide="loader-2" class="text-white w-5 h-5 animate-spin"></i>
                     </div>
@@ -126,11 +130,15 @@
                                     <div class="w-2 h-2 rounded-full bg-blue-400 animate-bounce" style="animation-delay: 0.15s;"></div>
                                     <div class="w-2 h-2 rounded-full bg-blue-400 animate-bounce" style="animation-delay: 0.3s;"></div>
                                 </div>
-                                <span class="text-sm text-slate-600">Analizando datos...</span>
+                                <span class="text-sm text-slate-600">Generando respuesta...</span>
                             </div>
                             <!-- Progress bar -->
                             <div class="mt-3 h-1 bg-slate-100 rounded-full overflow-hidden">
                                 <div class="h-full bg-gradient-to-r from-blue-600 to-purple-600 animate-progress"></div>
+                            </div>
+                            <div class="mt-2 text-xs text-slate-500 flex items-center gap-2">
+                                <i data-lucide="zap" class="w-3 h-3"></i>
+                                <span>Streaming activado - Respuesta en tiempo real</span>
                             </div>
                         </div>
                     </div>
@@ -144,7 +152,7 @@
                         <input type="text" x-model="inputText" 
                                class="w-full rounded-xl border border-slate-300 pl-5 pr-12 py-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm"
                                placeholder="Pregunta sobre el mercado inmobiliario..."
-                               :disabled="loading || ollamaStatus !== 'online'"
+                               :disabled="loading || streaming || ollamaStatus !== 'online'"
                                autocomplete="off">
                         <div class="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-slate-400" x-show="inputText.length > 0">
                             <span x-text="inputText.length"></span>/500
@@ -152,10 +160,10 @@
                     </div>
                     <button type="submit" 
                             class="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4 rounded-xl flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
-                            :disabled="loading || inputText.trim() === '' || ollamaStatus !== 'online'">
-                        <span x-show="!loading" class="font-medium">Analizar</span>
-                        <i data-lucide="send" class="w-5 h-5" x-show="!loading"></i>
-                        <i data-lucide="loader-2" class="w-5 h-5 animate-spin" x-show="loading" style="display: none;"></i>
+                            :disabled="loading || streaming || inputText.trim() === '' || ollamaStatus !== 'online'">
+                        <span x-show="!loading && !streaming" class="font-medium">Analizar</span>
+                        <i data-lucide="send" class="w-5 h-5" x-show="!loading && !streaming"></i>
+                        <i data-lucide="loader-2" class="w-5 h-5 animate-spin" x-show="loading || streaming" style="display: none;"></i>
                     </button>
                 </form>
                 
@@ -255,30 +263,153 @@
                         <div class="h-full bg-green-600 rounded-full" :style="`width: ${Math.max(100 - sessionMetrics.avgLatency / 50, 0)}%`"></div>
                     </div>
                 </div>
+                
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs text-slate-600 flex items-center gap-1">
+                            <i data-lucide="zap" class="w-3 h-3 text-green-600"></i>
+                            Cache Hits
+                        </span>
+                        <span class="text-lg font-bold text-green-600" x-text="sessionMetrics.cacheHits"></span>
+                    </div>
+                    <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div class="h-full bg-green-600 rounded-full" :style="`width: ${sessionMetrics.queries > 0 ? (sessionMetrics.cacheHits / sessionMetrics.queries * 100) : 0}%`"></div>
+                    </div>
+                </div>
             </div>
         </div>
 
         <!-- Available Models -->
-        <div class="bg-white rounded-2xl shadow-lg border border-slate-200 p-5">
-            <h3 class="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                <i data-lucide="package" class="w-5 h-5 text-orange-600"></i>
-                Modelos Disponibles
-            </h3>
+        <div class="bg-white rounded-2xl shadow-lg border border-slate-200 p-5 max-h-[600px] overflow-y-auto">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-semibold text-slate-900 flex items-center gap-2">
+                    <i data-lucide="package" class="w-5 h-5 text-orange-600"></i>
+                    Modelos SLM
+                </h3>
+                <button @click="showModelManager = !showModelManager" 
+                        class="text-xs px-2 py-1 rounded bg-slate-100 hover:bg-slate-200">
+                    <i data-lucide="filter" class="w-3 h-3 inline"></i>
+                </button>
+            </div>
             
+            <!-- Filters -->
+            <div x-show="showModelManager" class="mb-4 space-y-2 pb-4 border-b border-slate-200">
+                <select x-model="modelFilter" @change="updateAvailableModels()" 
+                        class="w-full text-xs px-2 py-1.5 rounded border border-slate-200">
+                    <option value="all">Todos los modelos</option>
+                    <option value="installed">Solo instalados</option>
+                    <option value="recommended">Recomendados</option>
+                </select>
+                
+                <select x-model="selectedSize" @change="updateAvailableModels()" 
+                        class="w-full text-xs px-2 py-1.5 rounded border border-slate-200">
+                    <option value="all">Todos los tamaños</option>
+                    <option value="tiny">Tiny (&lt;1B)</option>
+                    <option value="small">Small (1-3B)</option>
+                    <option value="medium">Medium (3-7B)</option>
+                    <option value="large">Large (7-13B)</option>
+                </select>
+                
+                <select x-model="selectedTask" @change="updateAvailableModels()" 
+                        class="w-full text-xs px-2 py-1.5 rounded border border-slate-200">
+                    <option value="all">Todas las tareas</option>
+                    <option value="analytics">Analytics</option>
+                    <option value="code">Code</option>
+                    <option value="reasoning">Reasoning</option>
+                    <option value="chat">Chat</option>
+                </select>
+            </div>
+            
+            <!-- Models List -->
             <div class="space-y-2">
                 <template x-for="model in availableModels" :key="model.name">
-                    <div class="p-3 rounded-lg border border-slate-200 hover:border-blue-300 transition-colors cursor-pointer"
-                         :class="model.name === currentModel ? 'bg-blue-50 border-blue-300' : 'bg-white'"
-                         @click="switchModel(model.name)">
-                        <div class="flex items-center justify-between">
+                    <div class="p-3 rounded-lg border transition-all"
+                         :class="model.name === currentModel ? 'bg-blue-50 border-blue-300 shadow-sm' : 'border-slate-200 hover:border-blue-200'">
+                        
+                        <!-- Model Header -->
+                        <div class="flex items-start justify-between mb-2">
                             <div class="flex-1">
-                                <div class="font-medium text-sm text-slate-900" x-text="model.name"></div>
-                                <div class="text-xs text-slate-500" x-text="model.size"></div>
+                                <div class="font-medium text-sm text-slate-900 flex items-center gap-2">
+                                    <span x-text="model.display_name || model.name"></span>
+                                    <i data-lucide="check-circle" class="w-4 h-4 text-blue-600" x-show="model.name === currentModel"></i>
+                                </div>
+                                <div class="text-xs text-slate-500 mt-0.5">
+                                    <span x-text="model.parameters"></span> • 
+                                    <span x-text="model.size_mb + 'MB'"></span>
+                                </div>
                             </div>
-                            <i data-lucide="check-circle" class="w-5 h-5 text-blue-600" x-show="model.name === currentModel"></i>
+                            
+                            <!-- Status Badge -->
+                            <div class="text-xs px-2 py-0.5 rounded-full font-medium"
+                                 :class="getModelBadgeColor(model)">
+                                <span x-show="model.installed">✓ Instalado</span>
+                                <span x-show="!model.installed">Disponible</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Performance Scores -->
+                        <div x-show="model.performance_score" class="grid grid-cols-3 gap-1 mb-2 text-xs">
+                            <div class="text-center">
+                                <div class="text-slate-500">Speed</div>
+                                <div class="font-semibold text-green-600" x-text="model.speed_score"></div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-slate-500">Quality</div>
+                                <div class="font-semibold text-blue-600" x-text="model.quality_score"></div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-slate-500">Overall</div>
+                                <div class="font-semibold text-purple-600" x-text="model.performance_score"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Description -->
+                        <p x-show="model.description" class="text-xs text-slate-600 mb-2" x-text="model.description"></p>
+                        
+                        <!-- Actions -->
+                        <div class="flex gap-1">
+                            <button x-show="model.installed && model.name !== currentModel" 
+                                    @click="switchModel(model.name)"
+                                    class="flex-1 text-xs px-2 py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white transition-colors">
+                                <i data-lucide="play" class="w-3 h-3 inline mr-1"></i>
+                                Usar
+                            </button>
+                            
+                            <button x-show="!model.installed" 
+                                    @click="downloadModel(model.name)"
+                                    :disabled="downloadingModel !== null"
+                                    class="flex-1 text-xs px-2 py-1.5 rounded bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-50">
+                                <i data-lucide="download" class="w-3 h-3 inline mr-1"></i>
+                                <span x-show="downloadingModel !== model.name">Descargar</span>
+                                <span x-show="downloadingModel === model.name">...</span>
+                            </button>
+                            
+                            <button x-show="model.installed" 
+                                    @click="benchmarkModel(model.name)"
+                                    class="text-xs px-2 py-1.5 rounded bg-slate-100 hover:bg-slate-200 transition-colors">
+                                <i data-lucide="zap" class="w-3 h-3 inline"></i>
+                            </button>
+                        </div>
+                        
+                        <!-- Benchmark Results -->
+                        <div x-show="benchmarkResults[model.name]" class="mt-2 pt-2 border-t border-slate-200 text-xs">
+                            <div class="flex justify-between text-slate-600">
+                                <span>Benchmark:</span>
+                                <span x-text="benchmarkResults[model.name]?.duration_ms + 'ms'"></span>
+                            </div>
+                            <div class="flex justify-between text-slate-600">
+                                <span>Tokens/seg:</span>
+                                <span x-text="benchmarkResults[model.name]?.tokens_per_second?.toFixed(1)"></span>
+                            </div>
                         </div>
                     </div>
                 </template>
+                
+                <!-- Empty State -->
+                <div x-show="availableModels.length === 0" class="text-center py-8 text-slate-500">
+                    <i data-lucide="inbox" class="w-12 h-12 mx-auto mb-2 opacity-50"></i>
+                    <p class="text-sm">No hay modelos disponibles con los filtros seleccionados</p>
+                </div>
             </div>
         </div>
     </div>
@@ -315,41 +446,85 @@
             messages: [],
             inputText: '',
             loading: false,
+            streaming: false,
             showSettings: true,
             ollamaStatus: 'checking',
             currentModel: 'qwen2.5-coder:1.5b',
-            availableModels: [
-                { name: 'qwen2.5-coder:1.5b', size: '900MB' }
-            ],
+            availableModels: [],
+            allModels: [],
+            modelFilter: 'all', // all, installed, recommended
+            selectedSize: 'all',
+            selectedTask: 'all',
+            showModelManager: false,
+            benchmarkResults: {},
+            downloadingModel: null,
+            responseCache: new Map(), // Caché de respuestas
+            cacheEnabled: true,
             sessionMetrics: {
                 queries: 0,
                 totalTokens: 0,
                 avgLatency: 0,
-                latencies: []
+                latencies: [],
+                cacheHits: 0
             },
 
             init() {
                 this.checkOllamaStatus();
+                this.loadAllModels();
                 // Check status every 30 seconds
                 setInterval(() => this.checkOllamaStatus(), 30000);
             },
 
+            async loadAllModels() {
+                try {
+                    const response = await fetch('/api/v2/slm/models');
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.allModels = data.data.models || [];
+                        this.updateAvailableModels();
+                    }
+                } catch (error) {
+                    console.error('Error loading models:', error);
+                }
+            },
+
+            updateAvailableModels() {
+                let filtered = this.allModels;
+                
+                // Filter by installation status
+                if (this.modelFilter === 'installed') {
+                    filtered = filtered.filter(m => m.installed);
+                } else if (this.modelFilter === 'recommended') {
+                    filtered = filtered.sort((a, b) => b.performance_score - a.performance_score).slice(0, 5);
+                }
+                
+                // Filter by size
+                if (this.selectedSize !== 'all') {
+                    filtered = filtered.filter(m => m.size_category === this.selectedSize);
+                }
+                
+                // Filter by task
+                if (this.selectedTask !== 'all') {
+                    filtered = filtered.filter(m => m.tasks && m.tasks.includes(this.selectedTask));
+                }
+                
+                this.availableModels = filtered;
+            },
+
             async checkOllamaStatus() {
                 try {
-                    const response = await fetch('http://localhost:11434/api/tags');
-                    if (response.ok) {
-                        this.ollamaStatus = 'online';
-                        const data = await response.json();
-                        if (data.models && data.models.length > 0) {
-                            this.availableModels = data.models.map(m => ({
-                                name: m.name,
-                                size: this.formatBytes(m.size)
-                            }));
+                    const statusResponse = await fetch('/api/v2/slm/status');
+                    if (statusResponse.ok) {
+                        const data = await statusResponse.json();
+                        this.ollamaStatus = data.data?.ollama?.status || 'offline';
+                        if (data.data?.agent?.current_model) {
+                            this.currentModel = data.data.agent.current_model;
                         }
                     } else {
                         this.ollamaStatus = 'offline';
                     }
                 } catch (error) {
+                    console.error('Error checking Ollama status:', error);
                     this.ollamaStatus = 'offline';
                 }
                 setTimeout(() => lucide.createIcons(), 50);
@@ -381,72 +556,232 @@
 
             async sendMessage() {
                 const text = this.inputText.trim();
-                if (!text || this.loading || this.ollamaStatus !== 'online') return;
+                if (!text || this.loading || this.streaming || this.ollamaStatus !== 'online') return;
 
                 const startTime = Date.now();
                 
+                // Check cache first
+                const cacheKey = `${this.currentModel}:${text.toLowerCase()}`;
+                if (this.cacheEnabled && this.responseCache.has(cacheKey)) {
+                    const cachedResponse = this.responseCache.get(cacheKey);
+                    this.messages.push({ role: 'user', content: text });
+                    this.messages.push({ 
+                        role: 'assistant', 
+                        content: cachedResponse.content,
+                        metrics: {
+                            duration: 0,
+                            tokens: cachedResponse.tokens,
+                            model: this.currentModel,
+                            cached: true
+                        }
+                    });
+                    this.sessionMetrics.cacheHits++;
+                    this.inputText = '';
+                    this.scrollToBottom();
+                    setTimeout(() => lucide.createIcons(), 50);
+                    return;
+                }
+                
                 this.messages.push({ role: 'user', content: text });
                 this.inputText = '';
-                this.loading = true;
+                this.streaming = true;
+                
+                // Add placeholder for streaming response
+                const messageIndex = this.messages.length;
+                this.messages.push({ 
+                    role: 'assistant', 
+                    content: '',
+                    streaming: true
+                });
                 
                 this.scrollToBottom();
 
                 try {
-                    const response = await fetch('/api/v2/agent/chat', {
+                    const response = await fetch('/api/analytics/chat/stream', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json',
-                            'X-API-KEY': 'default-secret-key'
+                            'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({ question: text })
                     });
 
-                    const data = await response.json();
-                    const duration = Date.now() - startTime;
-                    
-                    if (data.response) {
-                        // Estimate tokens (rough approximation)
-                        const tokens = Math.ceil((text.length + data.response.length) / 4);
-                        
-                        this.messages.push({ 
-                            role: 'assistant', 
-                            content: data.response,
-                            metrics: {
-                                duration: duration,
-                                tokens: tokens,
-                                model: this.currentModel
-                            }
-                        });
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
 
-                        // Update session metrics
-                        this.sessionMetrics.queries++;
-                        this.sessionMetrics.totalTokens += tokens;
-                        this.sessionMetrics.latencies.push(duration);
-                        this.sessionMetrics.avgLatency = Math.round(
-                            this.sessionMetrics.latencies.reduce((a, b) => a + b, 0) / this.sessionMetrics.latencies.length
-                        );
-                    } else {
-                        this.messages.push({ 
-                            role: 'assistant', 
-                            content: '❌ Error: ' + (data.error || 'No se pudo obtener respuesta') 
-                        });
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    let fullResponse = '';
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        const chunk = decoder.decode(value);
+                        const lines = chunk.split('\n');
+
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                try {
+                                    const data = JSON.parse(line.slice(6));
+                                    
+                                    if (data.type === 'chunk') {
+                                        fullResponse += data.content;
+                                        this.messages[messageIndex].content = fullResponse;
+                                        this.scrollToBottom();
+                                    } else if (data.type === 'error') {
+                                        this.messages[messageIndex].content = '❌ Error: ' + data.error;
+                                        this.messages[messageIndex].streaming = false;
+                                    } else if (data.type === 'done') {
+                                        this.messages[messageIndex].streaming = false;
+                                        const duration = Date.now() - startTime;
+                                        const tokens = Math.ceil((text.length + fullResponse.length) / 4);
+                                        
+                                        this.messages[messageIndex].metrics = {
+                                            duration: duration,
+                                            tokens: tokens,
+                                            model: this.currentModel
+                                        };
+
+                                        // Cache the response
+                                        if (this.cacheEnabled && fullResponse) {
+                                            this.responseCache.set(cacheKey, {
+                                                content: fullResponse,
+                                                tokens: tokens,
+                                                timestamp: Date.now()
+                                            });
+                                            // Limit cache size to 50 entries
+                                            if (this.responseCache.size > 50) {
+                                                const firstKey = this.responseCache.keys().next().value;
+                                                this.responseCache.delete(firstKey);
+                                            }
+                                        }
+
+                                        // Update session metrics
+                                        this.sessionMetrics.queries++;
+                                        this.sessionMetrics.totalTokens += tokens;
+                                        this.sessionMetrics.latencies.push(duration);
+                                        this.sessionMetrics.avgLatency = Math.round(
+                                            this.sessionMetrics.latencies.reduce((a, b) => a + b, 0) / this.sessionMetrics.latencies.length
+                                        );
+                                    }
+                                } catch (e) {
+                                    console.error('Error parsing SSE data:', e);
+                                }
+                            }
+                        }
                     }
                 } catch (error) {
-                    this.messages.push({ 
-                        role: 'assistant', 
-                        content: '❌ Error de conexión: ' + error.message 
-                    });
+                    this.messages[messageIndex].content = '❌ Error de conexión: ' + error.message;
+                    this.messages[messageIndex].streaming = false;
                 } finally {
-                    this.loading = false;
+                    this.streaming = false;
                     this.scrollToBottom();
                     setTimeout(() => lucide.createIcons(), 50);
                 }
             },
             
-            switchModel(modelName) {
-                this.currentModel = modelName;
-                // In a real implementation, you would call an API to switch models
-                console.log('Switching to model:', modelName);
+            async switchModel(modelName) {
+                if (this.loading) return;
+                
+                try {
+                    this.loading = true;
+                    const response = await fetch('/api/v2/slm/models/switch', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ model: modelName })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.currentModel = modelName;
+                        this.messages.push({
+                            role: 'assistant',
+                            content: `✅ Modelo cambiado a **${modelName}**. Puedes empezar a hacer preguntas.`
+                        });
+                        this.scrollToBottom();
+                    } else {
+                        alert('Error al cambiar modelo: ' + (data.error || 'Desconocido'));
+                    }
+                } catch (error) {
+                    console.error('Error switching model:', error);
+                    alert('Error de conexión al cambiar modelo');
+                } finally {
+                    this.loading = false;
+                    setTimeout(() => lucide.createIcons(), 50);
+                }
+            },
+
+            async downloadModel(modelName) {
+                if (this.downloadingModel) {
+                    alert('Ya hay una descarga en progreso');
+                    return;
+                }
+                
+                if (!confirm(`¿Descargar el modelo ${modelName}? Esto puede tomar varios minutos.`)) {
+                    return;
+                }
+                
+                try {
+                    this.downloadingModel = modelName;
+                    const response = await fetch('/api/v2/slm/models/pull', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ model: modelName })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        alert(`Modelo ${modelName} descargado exitosamente`);
+                        await this.loadAllModels();
+                        await this.checkOllamaStatus();
+                    } else {
+                        alert('Error al descargar: ' + (data.error || 'Desconocido'));
+                    }
+                } catch (error) {
+                    console.error('Error downloading model:', error);
+                    alert('Error de conexión al descargar modelo');
+                } finally {
+                    this.downloadingModel = null;
+                }
+            },
+
+            async benchmarkModel(modelName) {
+                if (this.loading) return;
+                
+                try {
+                    this.loading = true;
+                    const response = await fetch(`/api/v2/slm/models/${modelName}/benchmark`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: 'Analiza el mercado inmobiliario en Santiago' })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.benchmarkResults[modelName] = data.data;
+                        alert(`Benchmark completado:\n` +
+                              `Duración: ${data.data.duration_ms}ms\n` +
+                              `Tokens/seg: ${data.data.tokens_per_second.toFixed(2)}`);
+                    } else {
+                        alert('Error en benchmark: ' + (data.error || 'Desconocido'));
+                    }
+                } catch (error) {
+                    console.error('Error benchmarking model:', error);
+                    alert('Error de conexión en benchmark');
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            getModelBadgeColor(model) {
+                if (!model.installed) return 'bg-slate-100 text-slate-600';
+                if (model.performance_score >= 85) return 'bg-green-100 text-green-700';
+                if (model.performance_score >= 75) return 'bg-blue-100 text-blue-700';
+                return 'bg-yellow-100 text-yellow-700';
             },
             
             scrollToBottom() {
