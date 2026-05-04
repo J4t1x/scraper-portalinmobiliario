@@ -1,7 +1,7 @@
 """Add opportunities and analytics_cache tables
 
-Revision ID: 003
-Revises: 002
+Revision ID: 003_add_opportunities
+Revises: 001
 Create Date: 2026-04-10 23:00:00
 
 """
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '003'
-down_revision = '002'
+revision = '003_add_opportunities'
+down_revision = '001'
 branch_labels = None
 depends_on = None
 

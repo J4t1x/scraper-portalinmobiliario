@@ -25,6 +25,9 @@ bp = Blueprint('main', __name__)
 _scraper_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='scraper')
 _scraper_queue = deque(maxlen=10)  # Track queue entries
 _scraper_lock = threading.Lock()
+# Map execution_id -> live subprocess.Popen so we can terminate on cancel
+_scraper_processes: Dict[str, subprocess.Popen] = {}
+_scraper_processes_lock = threading.Lock()
 
 # SocketIO se importará dinámicamente cuando sea necesario
 _socketio = None
@@ -300,6 +303,10 @@ def api_run_manual_scraping():
         operacion = data.get('operacion', 'venta')
         tipo = data.get('tipo', 'departamento')
         max_pages = data.get('max_pages', 10)
+        try:
+            max_properties = int(data.get('max_properties') or 0)
+        except (TypeError, ValueError):
+            max_properties = 0
         formato = data.get('formato', 'json')
         scrape_details = data.get('scrape_details', True)
         verbose = data.get('verbose', False)
@@ -323,6 +330,7 @@ def api_run_manual_scraping():
             user_id=current_user.username if current_user else None,
             parameters={
                 'max_pages': max_pages,
+                'max_properties': max_properties,
                 'formato': formato,
                 'scrape_details': scrape_details,
                 'verbose': verbose
@@ -341,26 +349,33 @@ def api_run_manual_scraping():
         with _scraper_lock:
             _scraper_queue.append(queue_entry)
         
-        # Use python3 explicitly
+        # Use python3 explicitly, with -u for UNBUFFERED stdout (critical for real-time logs)
         python_cmd = sys.executable or 'python3'
         
         # Build command with execution ID
         cmd = [
             python_cmd,
+            '-u',  # Unbuffered stdout/stderr so logs stream immediately
             'main.py',
             '--operacion', operacion,
             '--tipo', tipo,
             '--max-pages', str(max_pages),
             '--formato', formato,
-            '--execution-id', execution_id
+            '--execution-id', execution_id,
+            '--persist-to-db'  # Persist to PostgreSQL so dashboard "Explorador de Datos" shows data
         ]
         
         if scrape_details:
             cmd.append('--scrape-details')
-            cmd.extend(['--max-detail-properties', '100'])
+            # Honor user-provided limit; default to 100 if not specified
+            detail_limit = max_properties if max_properties and max_properties > 0 else 100
+            cmd.extend(['--max-detail-properties', str(detail_limit)])
         
         if verbose:
             cmd.append('--verbose')
+        
+        # Ensure child Python is unbuffered so log lines arrive in real time
+        child_env = {**os.environ, 'PYTHONUNBUFFERED': '1'}
         
         logger.info(f"Encolando scraping manual: {' '.join(cmd)}")
         tracker.log_info(f"Comando encolado: {' '.join(cmd)}", source='dashboard')
@@ -376,6 +391,7 @@ def api_run_manual_scraping():
         # Submit to thread pool (queue) for sequential execution
         def run_scraping():
             queue_entry['status'] = 'running'
+            process = None
             try:
                 process = subprocess.Popen(
                     cmd,
@@ -383,11 +399,16 @@ def api_run_manual_scraping():
                     stderr=subprocess.STDOUT,
                     text=True,
                     bufsize=1,
-                    universal_newlines=True
+                    universal_newlines=True,
+                    env=child_env
                 )
                 
+                # Register live process so cancel endpoint can terminate it
+                with _scraper_processes_lock:
+                    _scraper_processes[execution_id] = process
+                
                 for line in process.stdout:
-                    line = line.strip()
+                    line = line.rstrip()
                     if line:
                         tracker.log_info(line, source='scraper')
                         if socketio:
@@ -402,6 +423,12 @@ def api_run_manual_scraping():
                 if process.returncode == 0:
                     tracker.complete_execution(status='completed')
                     queue_entry['status'] = 'completed'
+                elif process.returncode in (-15, -9, 143, 137):  # SIGTERM/SIGKILL from cancel
+                    tracker.complete_execution(
+                        status='cancelled',
+                        error_message='Cancelado por el usuario'
+                    )
+                    queue_entry['status'] = 'cancelled'
                 else:
                     tracker.complete_execution(
                         status='failed',
@@ -440,6 +467,10 @@ def api_run_manual_scraping():
                         'error': error_msg,
                         'timestamp': datetime.utcnow().isoformat()
                     })
+            finally:
+                # Always unregister the live process handle
+                with _scraper_processes_lock:
+                    _scraper_processes.pop(execution_id, None)
         
         # Submit to executor (runs sequentially, 1 at a time)
         _scraper_executor.submit(run_scraping)
@@ -501,26 +532,59 @@ def api_db_health():
 @login_required
 def api_analytics_chat():
     """API endpoint para interactuar con el agente de analítica (Ollama).
-    Acepta tanto 'message' como 'question' para compatibilidad con ambas interfaces."""
+    Acepta tanto 'message' como 'question' para compatibilidad con ambas interfaces.
+    
+    CoTHSSum: Por defecto usa el pipeline jerárquico de 3 capas para mejor coherencia.
+    Parámetros opcionales:
+    - use_cothssum: true/false (default: true)
+    - return_trace: true/false (default: false) - retorna trace completo del pipeline
+    """
     try:
         from ai.agent import AnalyticsAgent
         data = request.json or {}
         # Accept both 'message' (from old interface) and 'question' (from AI analytics template)
         message = data.get('message') or data.get('question', '')
         
+        # CoTHSSum parameters
+        use_cothssum = data.get('use_cothssum', True)
+        return_trace = data.get('return_trace', False)
+        
         if not message:
             return jsonify({'success': False, 'error': 'El mensaje no puede estar vacío'}), 400
             
         agent = AnalyticsAgent()
-        response_text = agent.generate_response(message)
+        response = agent.generate_response(
+            message,
+            use_cothssum=use_cothssum,
+            return_trace=return_trace
+        )
         
-        return jsonify({
-            'success': True,
-            'response': response_text,
-            'data': {
-                'response': response_text
-            }
-        })
+        # Si return_trace es true, response es un dict con metadata
+        if return_trace and isinstance(response, dict):
+            return jsonify({
+                'success': True,
+                'response': response.get('response'),
+                'data': {
+                    'response': response.get('response'),
+                    'trace': response.get('trace'),
+                    'metadata': response.get('metadata'),
+                    'layer1_insights': response.get('layer1_insights'),
+                    'layer2_patterns': response.get('layer2_patterns'),
+                    'layer3_reasoning': response.get('layer3_reasoning'),
+                    'trace_id': response.get('trace_id'),
+                    'method': 'cothssum'
+                }
+            })
+        else:
+            # Respuesta simple (string)
+            return jsonify({
+                'success': True,
+                'response': response,
+                'data': {
+                    'response': response,
+                    'method': 'cothssum' if use_cothssum else 'standard'
+                }
+            })
     except Exception as e:
         logger.error(f"Error en api_analytics_chat: {str(e)}", exc_info=True)
         return jsonify({
@@ -678,18 +742,41 @@ def api_scraper_execution_logs(execution_id):
 @bp.route('/api/scraper/executions/<execution_id>/cancel', methods=['POST'])
 @login_required
 def api_scraper_execution_cancel(execution_id):
-    """API endpoint para cancelar una ejecución del scraper"""
+    """API endpoint para cancelar una ejecución del scraper.
+    
+    Además de marcarla como cancelada en la BD, termina el subprocess si sigue vivo.
+    """
     try:
         db_loader = DatabaseLoader()
         
-        # Cancelar la ejecución
+        # 1. Intentar terminar el subprocess si sigue activo
+        process_terminated = False
+        with _scraper_processes_lock:
+            process = _scraper_processes.get(execution_id)
+        
+        if process is not None and process.poll() is None:
+            try:
+                process.terminate()
+                # Dar 5s para terminar limpio; si no, matar
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=2)
+                process_terminated = True
+                logger.info(f"Subprocess de ejecución {execution_id} terminado")
+            except Exception as term_err:
+                logger.warning(f"No se pudo terminar subprocess {execution_id}: {term_err}")
+        
+        # 2. Marcar como cancelada en BD
         success = db_loader.cancel_execution(execution_id)
         
-        if success:
+        if success or process_terminated:
             logger.info(f"Ejecución {execution_id} cancelada por usuario {current_user.username}")
             return jsonify({
                 'success': True,
-                'message': 'Ejecución cancelada exitosamente'
+                'message': 'Ejecución cancelada exitosamente',
+                'process_terminated': process_terminated
             })
         else:
             return jsonify({
@@ -702,6 +789,123 @@ def api_scraper_execution_cancel(execution_id):
             'success': False,
             'error': str(e)
         }), 500
+
+
+@bp.route('/api/scraper/executions/<execution_id>/live')
+@login_required
+def api_scraper_execution_live(execution_id):
+    """API endpoint para consultar estado + últimos logs de una ejecución en vivo.
+    
+    Permite al dashboard mostrar progreso en tiempo real aun sin Socket.IO
+    (polling como fallback). Acepta ?since=<log_id> para traer solo logs nuevos.
+    """
+    try:
+        db_loader = DatabaseLoader()
+        execution = db_loader.get_execution_by_id(execution_id)
+        
+        if not execution:
+            return jsonify({'success': False, 'error': 'Ejecución no encontrada'}), 404
+        
+        since_id = request.args.get('since', type=int)
+        logs = execution.get('logs', []) or []
+        
+        if since_id is not None:
+            logs = [l for l in logs if (l.get('id') or 0) > since_id]
+        
+        # Subprocess vivo?
+        with _scraper_processes_lock:
+            proc = _scraper_processes.get(execution_id)
+        process_alive = bool(proc and proc.poll() is None)
+        
+        last_log_id = max((l.get('id') or 0 for l in (execution.get('logs') or [])), default=since_id or 0)
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'execution_id': execution_id,
+                'status': execution.get('status'),
+                'operacion': execution.get('operacion'),
+                'tipo': execution.get('tipo'),
+                'start_time': execution.get('start_time'),
+                'end_time': execution.get('end_time'),
+                'duration': execution.get('duration'),
+                'properties_scraped': execution.get('properties_scraped') or 0,
+                'properties_new': execution.get('properties_new') or 0,
+                'properties_updated': execution.get('properties_updated') or 0,
+                'pages_processed': execution.get('pages_processed') or 0,
+                'error_message': execution.get('error_message'),
+                'process_alive': process_alive,
+                'new_logs': logs,
+                'last_log_id': last_log_id,
+                'total_logs': len(execution.get('logs') or [])
+            }
+        })
+    except Exception as e:
+        logger.error(f"Error en api_scraper_execution_live: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@bp.route('/api/daily-opportunities')
+def api_daily_opportunities():
+    """API endpoint para obtener oportunidades del día con analítica multi-criterio desde PostgreSQL.
+    Si la tabla opportunities está vacía, hace fallback a la lógica JSON."""
+    try:
+        from analytics import PropertyAnalytics
+        tipo_filter = request.args.get('tipo')
+        comuna_filter = request.args.get('comuna')
+        limit = request.args.get('limit', 20, type=int)
+
+        with PropertyAnalytics() as analytics:
+            data = analytics.get_daily_opportunities(
+                limit=limit,
+                tipo_filter=tipo_filter,
+                comuna_filter=comuna_filter,
+            )
+
+        # If no data from DB, try JSON fallback
+        if not data.get('featured') and not data.get('top_list'):
+            logger.warning("No opportunities from DB, trying JSON fallback")
+            try:
+                json_loader = JSONDataLoader()
+                json_data = _get_opportunities_from_json(json_loader)
+                # Adapt JSON structure to new API format
+                data = {
+                    'featured': json_data.get('featured'),
+                    'top_list': json_data.get('top_5', []),
+                    'score_summary': {},
+                    'market_stats': json_data.get('market_stats', {}),
+                    'communes': json_data.get('communes', []),
+                    'alerts': json_data.get('alerts', []) + [{
+                        'type': 'warning',
+                        'message': 'Datos desde JSON. Ejecuta "Correr análisis" para usar el motor multi-criterio.'
+                    }],
+                    'meta': {
+                        'total': len(json_data.get('top_5', [])),
+                        'last_updated': None,
+                        'data_source': 'json'
+                    }
+                }
+            except Exception as json_err:
+                logger.error(f"JSON fallback failed: {json_err}")
+                data['alerts'] = [{'type': 'warning', 'message': 'No hay datos. Ejecuta el scraper primero.'}]
+
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        logger.error(f"Error en api_daily_opportunities: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@bp.route('/api/daily-opportunities/run-pipeline', methods=['POST'])
+@login_required
+def api_run_analytics_pipeline():
+    """Ejecuta el pipeline completo de analítica: precio/m², estadísticas y detección de oportunidades."""
+    try:
+        from analytics import run_analytics_pipeline
+        result = run_analytics_pipeline()
+        return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        logger.error(f"Error en api_run_analytics_pipeline: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @bp.route('/api/investment-opportunities')
 @login_required

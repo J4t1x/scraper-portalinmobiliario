@@ -222,9 +222,14 @@ class DataMigrator:
             session: SQLAlchemy session
             prop_dict: Property dictionary
         """
-        # Check for duplicate by URL
-        existing = session.query(Property).filter_by(url=prop_dict.get('url')).first()
-        
+        # Check for duplicate by portal_id (the real UNIQUE constraint in DB)
+        portal_id = prop_dict.get('id') or prop_dict.get('portal_id')
+        existing = None
+        if portal_id:
+            existing = session.query(Property).filter_by(portal_id=portal_id).first()
+        if not existing and prop_dict.get('url'):
+            existing = session.query(Property).filter_by(url=prop_dict.get('url')).first()
+
         if existing and self.skip_duplicates:
             self.stats['duplicates'] += 1
             return
@@ -284,6 +289,12 @@ class DataMigrator:
                     ))
         
         session.add(property_obj)
+        # Flush so subsequent duplicate checks within the same batch see this property
+        try:
+            session.flush()
+        except Exception:
+            session.rollback()
+            raise
     
     def _parse_and_insert_features(self, session, property_obj, atributos_str: str) -> None:
         """

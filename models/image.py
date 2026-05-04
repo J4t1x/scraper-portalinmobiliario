@@ -2,7 +2,7 @@
 Image model for property images.
 """
 
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, Text, ForeignKey
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -30,9 +30,12 @@ class Image(Base):
         nullable=False,
         index=True
     )
-    url = Column(String(500), nullable=False)
+    url = Column(Text, nullable=False)
     es_principal = Column(Boolean, default=False, nullable=False)
-    
+    orden = Column(Integer, nullable=True)
+    alt = Column(Text, nullable=True)
+    resolucion = Column(String(20), nullable=True)  # e.g. "2X", "1200x800"
+
     # Relationship
     property = relationship("Property", back_populates="images")
     

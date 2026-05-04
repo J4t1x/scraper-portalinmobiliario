@@ -13,7 +13,9 @@ from typing import Dict, Any, Optional, List
 logger = logging.getLogger(__name__)
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
-MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:1.5b")
+# Modelo por defecto elegido tras benchmark (scripts/test_ollama_params.py):
+# qwen2.5-coder:0.5b ofrece TTFT ~950ms y total ~1.6s en CPU, ideal para UI fluida.
+MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:0.5b")
 
 # Import SLM manager for model management
 try:
@@ -266,11 +268,15 @@ class AnalyticsAgent:
                     ],
                     "stream": False,
                     "options": {
-                        "temperature": 0.7,
-                        "top_p": 0.9,
-                        "num_predict": 300,  # Reducido de 500 para respuestas más rápidas
-                        "num_ctx": 2048,  # Contexto optimizado
-                        "num_thread": 4  # Paralelización
+                        # Parámetros optimizados vía scripts/test_ollama_params.py
+                        # (perfil "fluido": TTFT ~950ms, total ~1.6s, score 0.79)
+                        "temperature": 0.2,
+                        "top_p": 0.8,
+                        "top_k": 20,
+                        "num_predict": 180,
+                        "num_ctx": 2048,
+                        "repeat_penalty": 1.15,
+                        "num_thread": 4
                     }
                 },
                 timeout=60
@@ -319,10 +325,13 @@ class AnalyticsAgent:
                     ],
                     "stream": True,
                     "options": {
-                        "temperature": 0.7,
-                        "top_p": 0.9,
-                        "num_predict": 300,
+                        # Parámetros optimizados vía scripts/test_ollama_params.py
+                        "temperature": 0.2,
+                        "top_p": 0.8,
+                        "top_k": 20,
+                        "num_predict": 180,
                         "num_ctx": 2048,
+                        "repeat_penalty": 1.15,
                         "num_thread": 4
                     }
                 },
@@ -351,7 +360,13 @@ class AnalyticsAgent:
             self._ollama_available = None
             yield "\n\n⚠️ Error de conexión con Ollama."
     
-    def generate_response(self, user_message: str, context: Optional[Dict[str, Any]] = None) -> str:
+    def generate_response(
+        self,
+        user_message: str,
+        context: Optional[Dict[str, Any]] = None,
+        use_cothssum: bool = True,
+        return_trace: bool = False
+    ) -> str | Dict[str, Any]:
         """
         Generate a response using context from the database.
         Compatible API for use from dashboard routes.
@@ -359,14 +374,103 @@ class AnalyticsAgent:
         Args:
             user_message: User's question
             context: Optional pre-built context dict
+            use_cothssum: Whether to use CoTHSSum pipeline (default: True)
+            return_trace: Whether to return full trace with metadata
             
         Returns:
-            Agent's response string
+            Agent's response string or dict with response + trace
         """
         if context is None:
             context = self._build_context_from_db()
         
-        return self.ask(user_message, context)
+        if use_cothssum:
+            return self.ask_cothssum(user_message, context, return_trace=return_trace)
+        else:
+            return self.ask(user_message, context)
+    
+    def ask_cothssum(
+        self,
+        question: str,
+        context: Dict[str, Any],
+        return_trace: bool = False
+    ) -> str | Dict[str, Any]:
+        """
+        Ask the agent using CoTHSSum hierarchical pipeline.
+        
+        CoTHSSum ejecuta un pipeline de 3 capas:
+        - Capa 1: Micro-insights (análisis fragmentado con Chain-of-Thought)
+        - Capa 2: Patrones globales (agregación y síntesis)
+        - Capa 3: Conclusiones (razonamiento final y decisiones)
+        
+        Args:
+            question: User's question
+            context: Analytics insights (opportunities, stats, etc.)
+            return_trace: Whether to return full trace with metadata
+            
+        Returns:
+            Agent's response string or dict with response + full trace
+        """
+        # Lazy loading: cargar modelo solo cuando se necesita
+        if not self._ensure_loaded():
+            if return_trace:
+                return {
+                    'response': "⚠️ El agente IA no está disponible en este momento. Por favor, verifica que Ollama esté corriendo.",
+                    'trace': None,
+                    'error': 'Ollama not available'
+                }
+            return "⚠️ El agente IA no está disponible en este momento. Por favor, verifica que Ollama esté corriendo."
+        
+        try:
+            from ai.cothssum import CoTHSSumPipeline, format_cothssum_trace
+            
+            # Inicializar pipeline CoTHSSum
+            pipeline = CoTHSSumPipeline(agent=self, max_chunk_size=5)
+            
+            # Ejecutar pipeline
+            result = pipeline.execute(question, context)
+            
+            if return_trace:
+                # Retornar respuesta completa con trace y métricas
+                return {
+                    'response': result.layer3_conclusion,
+                    'trace': format_cothssum_trace(result),
+                    'metadata': result.metadata,
+                    'layer1_insights': result.layer1_micro_insights,
+                    'layer2_patterns': result.layer2_global_patterns,
+                    'layer3_reasoning': result.layer3_reasoning,
+                    'trace_id': result.trace_id,
+                    # Métricas granulares por capa
+                    'layer1_metrics': {
+                        'duration_ms': result.layer1_metrics.duration_ms,
+                        'tokens_estimated': result.layer1_metrics.tokens_estimated,
+                        'success': result.layer1_metrics.success,
+                        'cache_hit': result.layer1_metrics.cache_hit
+                    },
+                    'layer2_metrics': {
+                        'duration_ms': result.layer2_metrics.duration_ms,
+                        'tokens_estimated': result.layer2_metrics.tokens_estimated,
+                        'success': result.layer2_metrics.success,
+                        'cache_hit': result.layer2_metrics.cache_hit
+                    },
+                    'layer3_metrics': {
+                        'duration_ms': result.layer3_metrics.duration_ms,
+                        'tokens_estimated': result.layer3_metrics.tokens_estimated,
+                        'success': result.layer3_metrics.success,
+                        'cache_hit': result.layer3_metrics.cache_hit
+                    }
+                }
+            else:
+                # Retornar solo la conclusión final
+                return result.layer3_conclusion
+                
+        except ImportError as e:
+            logger.warning(f"CoTHSSum no disponible: {e}. Usando modo estándar.")
+            # Fallback al modo estándar
+            return self.ask(question, context)
+        except Exception as e:
+            logger.error(f"Error en CoTHSSum pipeline: {e}")
+            # Fallback al modo estándar
+            return self.ask(question, context)
     
     def _build_context_from_db(self) -> Dict[str, Any]:
         """Build context from database using DatabaseLoader."""
@@ -392,83 +496,15 @@ class AnalyticsAgent:
         return context
     
     def _build_system_prompt(self, context: Dict[str, Any]) -> str:
-        """Build system prompt for the agent."""
-        return f"""Eres un asistente de analítica inmobiliaria experto en el mercado chileno.
-Tu tarea es responder preguntas sobre oportunidades de inversión en propiedades.
+        """Build system prompt for the agent.
 
-CONTEXTO (datos reales del sistema):
-{self._format_context(context)}
+        Delega en ``ai.prompts`` para mantener una única fuente de verdad
+        compartida con el harness de tuning (scripts/test_ollama_params.py).
+        """
+        from ai.prompts import build_analytics_system_prompt
+        return build_analytics_system_prompt(context)
 
-INSTRUCCIONES:
-- Responde de forma concisa y clara en español
-- Usa los datos del contexto, NO inventes números
-- Si no tienes suficiente información, dilo
-- Menciona las mejores oportunidades si es relevante
-- Usa formato markdown para listas y énfasis
-- Sé profesional y analítico"""
-    
     def _format_context(self, context: Dict[str, Any]) -> str:
-        """Format context for the prompt."""
-        formatted = []
-        
-        # Format stats
-        if 'stats' in context:
-            stats = context['stats']
-            formatted.append(f"Total de propiedades: {stats.get('total', 0)}")
-            if stats.get('by_operacion'):
-                formatted.append(f"Por operación: {stats['by_operacion']}")
-            if stats.get('by_tipo'):
-                formatted.append(f"Por tipo: {stats['by_tipo']}")
-            if stats.get('precio_promedio'):
-                formatted.append(f"Precio promedio: ${stats['precio_promedio']:,}")
-        
-        # Format market stats
-        if 'market_stats' in context:
-            ms = context['market_stats']
-            if ms.get('avg_price_m2'):
-                formatted.append(f"\nPrecio promedio por m²: ${ms['avg_price_m2']:,}")
-            if ms.get('total_value'):
-                formatted.append(f"Valor total del mercado: ${ms['total_value']:,}")
-        
-        # Format opportunities
-        if 'opportunities' in context:
-            opps = context['opportunities']
-            if isinstance(opps, list) and opps:
-                formatted.append(f"\nTop oportunidades ({len(opps)}):")
-                for i, opp in enumerate(opps[:5], 1):
-                    if isinstance(opp, dict):
-                        prop = opp.get('property', opp)
-                        titulo = prop.get('titulo', 'N/A') if isinstance(prop, dict) else 'N/A'
-                        score = opp.get('score', 0)
-                        price_m2 = opp.get('price_m2', 0)
-                        discount = opp.get('discount_percentage', 0)
-                        formatted.append(
-                            f"{i}. {titulo} (Score: {score}, "
-                            f"Precio/m²: ${price_m2:,}, "
-                            f"Descuento: {discount}%)"
-                        )
-        
-        # Format communes
-        if 'communes' in context:
-            communes = context['communes']
-            if isinstance(communes, list) and communes:
-                formatted.append("\nEstadísticas por comuna:")
-                for commune in communes[:5]:
-                    if isinstance(commune, dict):
-                        formatted.append(
-                            f"- {commune.get('name', 'N/A')}: "
-                            f"${commune.get('avg_price_m2', 0):,}/m² "
-                            f"({commune.get('count', 0)} propiedades)"
-                        )
-        
-        # Legacy format support
-        if 'stats_by_comuna' in context:
-            formatted.append("\nEstadísticas por comuna:")
-            for stat in context['stats_by_comuna'][:5]:
-                formatted.append(
-                    f"- {stat.get('comuna', 'N/A')}: "
-                    f"Promedio ${stat.get('avg_precio_m2', 0):,.0f}/m² "
-                    f"({stat.get('total_propiedades', 0)} propiedades)"
-                )
-        
-        return "\n".join(formatted) if formatted else "No hay datos disponibles"
+        """Format context for the prompt (delegado a ai.prompts)."""
+        from ai.prompts import format_analytics_context
+        return format_analytics_context(context)

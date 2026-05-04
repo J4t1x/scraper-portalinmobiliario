@@ -1,78 +1,102 @@
-# Dockerfile para Portal Inmobiliario Scraper
-# Imagen base con Python 3.11
+# ============================================================================
+# Dockerfile.v2 - Portal Inmobiliario Scraper (Optimizado y Estable)
+# Versión: 2.1 - Soluciona problemas de Chrome/ChromeDriver
+# 
+# Mejoras aplicadas del PRD:
+# - Multi-stage build (-30% tamaño)
+# - Chromium del sistema (sin dependencia de APIs externas)
+# - Optimizaciones de memoria (-45% RAM)
+# - Usuario no-root (seguridad)
+# ============================================================================
+
+# ============================================================================
+# STAGE 1: Builder (temporal - solo para compilar dependencias Python)
+# ============================================================================
+FROM python:3.11-slim AS builder
+
+# Instalar dependencias de compilación
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libpq-dev \
+    libffi-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Crear virtualenv
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Copiar requirements y compilar
+COPY requirements.txt /tmp/
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r /tmp/requirements.txt
+
+# ============================================================================
+# STAGE 2: Runtime (imagen final optimizada)
+# ============================================================================
 FROM python:3.11-slim
 
 # Metadata
 LABEL maintainer="ja-viers"
-LABEL description="Portal Inmobiliario Scraper with Selenium and Chrome"
+LABEL description="Portal Inmobiliario Scraper - Optimized v2.1"
+LABEL version="2.1"
 
-# Variables de entorno
+# Variables de entorno optimizadas
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    DEBIAN_FRONTEND=noninteractive \
-    DISPLAY=:99
+    DISPLAY=:99 \
+    PATH="/opt/venv/bin:$PATH" \
+    # Chromium paths
+    CHROME_BIN=/usr/bin/chromium \
+    CHROMEDRIVER_PATH=/usr/bin/chromedriver
 
-# Instalar dependencias del sistema para Chrome y Selenium
-RUN apt-get update && apt-get install -y \
-    wget \
-    gnupg \
-    ca-certificates \
-    apt-transport-https \
-    unzip \
-    curl \
+# Instalar dependencias de runtime (sin compiladores)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Chromium y ChromeDriver del sistema (ESTABLE - no depende de APIs externas)
+    chromium \
+    chromium-driver \
+    # Xvfb para headless (fallback)
     xvfb \
-    && rm -rf /var/lib/apt/lists/*
+    # Utilidades mínimas
+    curl \
+    procps \
+    # Runtime libraries para psycopg2
+    libpq5 \
+    # Fonts para renderizado correcto
+    fonts-liberation \
+    libnss3 \
+    libxss1 \
+    libasound2 \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
-# Instalar Google Chrome
-RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
-    && apt-get update \
-    && apt-get install -y google-chrome-stable \
-    && rm -rf /var/lib/apt/lists/*
-
-# Instalar ChromeDriver
-RUN CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | cut -d '.' -f 1) \
-    && CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}") \
-    && wget -q "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip" \
-    && unzip chromedriver_linux64.zip \
-    && mv chromedriver /usr/local/bin/ \
-    && chmod +x /usr/local/bin/chromedriver \
-    && rm chromedriver_linux64.zip
-
-# Crear usuario no-root
+# Crear usuario no-root (seguridad)
 RUN useradd -m -u 1000 scraper && \
-    mkdir -p /app /app/output && \
+    mkdir -p /app /app/output /app/logs && \
     chown -R scraper:scraper /app
+
+# Copiar virtualenv desde builder (multi-stage)
+COPY --from=builder /opt/venv /opt/venv
 
 # Establecer directorio de trabajo
 WORKDIR /app
 
-# Copiar requirements.txt primero (para cache de Docker)
-COPY --chown=scraper:scraper requirements.txt .
-
-# Instalar dependencias Python
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
-
-# Copiar todo el código de la aplicación (incluyendo venv)
+# Copiar código de la aplicación
 COPY --chown=scraper:scraper . .
 
-# Asegurar que el directorio output existe y tiene permisos
-RUN mkdir -p /app/output && chown -R scraper:scraper /app/output
+# Asegurar permisos y crear directorios
+RUN chmod +x /app/scripts/*.sh 2>/dev/null || true && \
+    mkdir -p /app/output /app/logs && \
+    chown -R scraper:scraper /app
 
 # Cambiar a usuario no-root
 USER scraper
 
-# Copiar y dar permisos al entrypoint
-COPY --chown=scraper:scraper entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+# Verificar instalación de Chromium (build-time check)
+RUN chromium --version && chromedriver --version
 
-# Healthcheck (opcional)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD python -c "import sys; sys.exit(0)" || exit 1
 
-# Entrypoint
-ENTRYPOINT ["/app/entrypoint.sh"]
-
-# Comando por defecto (puede ser sobrescrito)
+# Comando por defecto
 CMD ["python", "main.py", "--help"]

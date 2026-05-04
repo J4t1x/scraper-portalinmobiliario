@@ -1,12 +1,16 @@
 import requests
 from config_flask import FlaskConfig
-from data_loader import JSONDataLoader
 from logger_config import get_logger
 import json
 
 logger = get_logger(__name__)
 
 class AnalyticsAgent:
+    """
+    Analytics Agent that uses Ollama for AI-powered data analysis.
+    Uses DatabaseLoader as primary data source (falls back to JSONDataLoader).
+    """
+    
     def __init__(self):
         self.ollama_url = FlaskConfig.OLLAMA_URL
         self.model = FlaskConfig.OLLAMA_MODEL
@@ -15,25 +19,56 @@ class AnalyticsAgent:
     def _test_connection(self) -> bool:
         """Verifica que Ollama esté disponible"""
         try:
-            response = requests.get(f"{self.ollama_url}/api/tags", timeout=2)
-            return response.status_code == 200
-        except Exception as e:
-            logger.warning(f"No se pudo conectar a Ollama: {e}")
+            response = requests.get(f"{self.ollama_url}/api/tags", timeout=5)
+            if response.status_code == 200:
+                logger.info(f"✅ Ollama conectado en {self.ollama_url}")
+                return True
             return False
+        except Exception as e:
+            logger.warning(f"No se pudo conectar a Ollama en {self.ollama_url}: {e}")
+            return False
+    
+    def _get_stats_data(self) -> str:
+        """Get stats from database, falling back to JSON files."""
+        try:
+            from db_loader import DatabaseLoader
+            db_loader = DatabaseLoader()
+            stats = db_loader.get_stats()
+            
+            # Try to get investment data too
+            try:
+                opportunities = db_loader.get_investment_opportunities()
+                stats['market_stats'] = opportunities.get('market_stats', {})
+                stats['top_communes'] = opportunities.get('communes', [])[:5]
+                stats['top_opportunities'] = len(opportunities.get('top_5', []))
+            except Exception as e:
+                logger.debug(f"Could not load investment data: {e}")
+            
+            return json.dumps(stats, indent=2, ensure_ascii=False, default=str)
+            
+        except Exception as e:
+            logger.warning(f"Error obteniendo datos de BD: {e}. Fallback a JSON.")
+            try:
+                from data_loader import JSONDataLoader
+                loader = JSONDataLoader()
+                try:
+                    advanced_stats = loader.get_advanced_stats()
+                except Exception:
+                    advanced_stats = loader.get_stats()
+                return json.dumps(advanced_stats, indent=2, ensure_ascii=False, default=str)
+            except Exception as e2:
+                logger.error(f"Error obteniendo datos JSON: {e2}")
+                return '{"error": "No se pudieron cargar datos"}'
     
     def generate_response(self, user_message: str) -> str:
         if not self.client:
-            return "Error: El Agente de Analítica no está configurado. Asegúrate de que Ollama esté corriendo (ollama serve)."
+            # Retry connection
+            self.client = self._test_connection()
+            if not self.client:
+                return "Error: El Agente de Analítica no está disponible. Verifica que Ollama esté corriendo y accesible."
             
         try:
-            loader = JSONDataLoader()
-            try:
-                advanced_stats = loader.get_advanced_stats()
-            except Exception as e:
-                logger.warning(f"Error obteniendo estadísticas avanzadas: {e}. Fallback a estadísticas básicas.")
-                advanced_stats = loader.get_stats()
-                
-            stats_json = json.dumps(advanced_stats, indent=2, ensure_ascii=False)
+            stats_json = self._get_stats_data()
             
             system_prompt = f"""
             Eres un agente experto en análisis de datos del mercado inmobiliario chileno. 
@@ -78,7 +113,8 @@ class AnalyticsAgent:
             return "La solicitud tardó demasiado. Intenta con una pregunta más simple o verifica que Ollama esté corriendo."
         except requests.exceptions.RequestException as e:
             logger.error(f"Error de conexión con Ollama: {str(e)}")
-            return "No se pudo conectar con Ollama. Asegúrate de que esté corriendo con 'ollama serve'."
+            self.client = False  # Force re-check on next call
+            return "No se pudo conectar con Ollama. Verifica que el servicio esté corriendo."
         except Exception as e:
             logger.error(f"Error generando respuesta con Ollama: {str(e)}")
             return "Ocurrió un error al procesar tu consulta con la IA. Verifica los logs para más detalles."

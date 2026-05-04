@@ -23,6 +23,14 @@ wheels/
 .installed.cfg
 *.egg
 
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+coverage.xml
+*.cover
+
 # Environment
 .env
 
@@ -43,7 +51,22 @@ logs/*.json
 *.swp
 *.swo
 *~
+.obsidian/
+
+# Temporary files
+*.tmp
+*~
+.DS_Store
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Backups and archives
+backups/
+archive/
+*.zip
+
+# Sensitive/Generated
+cookies.txt
+data/*.backup

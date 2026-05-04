@@ -37,13 +37,13 @@
     <div class="bg-white rounded-lg shadow p-4 md:p-6 border border-slate-200">
         <h2 class="text-lg font-semibold text-slate-900 mb-4">Filtros</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <!-- Archivo JSON -->
+            <!-- Captura / Ejecución -->
             <div class="sm:col-span-2 lg:col-span-1">
-                <label class="block text-sm font-medium text-slate-700 mb-2">Archivo JSON</label>
-                <select id="filter-file" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
-                    <option value="">Cargando archivos...</option>
+                <label class="block text-sm font-medium text-slate-700 mb-2">Captura / Ejecución</label>
+                <select id="filter-execution" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
+                    <option value="">Cargando capturas...</option>
                 </select>
-                <div id="file-info" class="text-xs text-slate-500 mt-1 break-words"></div>
+                <div id="execution-info" class="text-xs text-slate-500 mt-1 break-words"></div>
             </div>
 
             <!-- Búsqueda -->
@@ -205,13 +205,13 @@
 let currentPage = 1;
 let totalPages = 1;
 let currentFilters = {};
-let selectedFile = '';
-let availableFiles = [];
+let selectedExecution = '';
+let availableExecutions = [];
 let currentView = 'table';
 
 // Cargar datos al iniciar
 document.addEventListener('DOMContentLoaded', function() {
-    loadJsonFiles();
+    loadExecutions();
     loadProperties();
 
     // Búsqueda en tiempo real (con debounce)
@@ -223,65 +223,64 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 500);
     });
 
-    // Manejar cambio de archivo
-    document.getElementById('filter-file').addEventListener('change', function() {
-        selectedFile = this.value;
-        updateFileInfo();
+    // Manejar cambio de ejecución
+    document.getElementById('filter-execution').addEventListener('change', function() {
+        selectedExecution = this.value;
+        updateExecutionInfo();
         loadProperties(1);
     });
 });
 
-function loadJsonFiles() {
-    fetch('/api/json-files')
+function loadExecutions() {
+    fetch('/api/scraper/executions?per_page=50')
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                availableFiles = data.data.files;
-                const latestFile = data.data.latest;
+                availableExecutions = data.data;
+                const latestExecution = availableExecutions.length > 0 ? availableExecutions[0] : null;
 
                 // Populate dropdown
-                const select = document.getElementById('filter-file');
-                select.innerHTML = '<option value="">Todos los archivos</option>';
+                const select = document.getElementById('filter-execution');
+                select.innerHTML = '<option value="">Todas las capturas</option>';
 
-                availableFiles.forEach(file => {
+                availableExecutions.forEach((exec, index) => {
                     const option = document.createElement('option');
-                    option.value = file.filename;
-                    const metadata = file.metadata || {};
-                    const label = `${file.filename} (${metadata.total || '?'} propiedades)`;
+                    option.value = exec.execution_id;
+                    const dateInfo = new Date(exec.start_time).toLocaleString('es-CL');
+                    const label = `${exec.operacion} ${exec.tipo} - ${dateInfo} (${exec.properties_scraped || 0} props)`;
                     option.textContent = label;
-                    if (latestFile && file.filename === latestFile.filename) {
-                        option.textContent += ' (Último)';
+                    if (index === 0) {
+                        option.textContent += ' (Última)';
                     }
                     select.appendChild(option);
                 });
 
-                // Select latest file by default
-                if (latestFile) {
-                    selectedFile = latestFile.filename;
-                    select.value = latestFile.filename;
-                    updateFileInfo(latestFile);
+                // Select latest execution by default
+                if (latestExecution) {
+                    selectedExecution = latestExecution.execution_id;
+                    select.value = latestExecution.execution_id;
+                    updateExecutionInfo(latestExecution);
                 }
             }
         })
         .catch(error => {
-            console.error('Error loading JSON files:', error);
+            console.error('Error loading executions:', error);
         });
 }
 
-function updateFileInfo(fileInfo = null) {
-    const infoDiv = document.getElementById('file-info');
-    if (!selectedFile) {
-        infoDiv.textContent = 'Todos los archivos combinados';
+function updateExecutionInfo(execInfo = null) {
+    const infoDiv = document.getElementById('execution-info');
+    if (!selectedExecution) {
+        infoDiv.textContent = 'Todas las capturas combinadas';
         return;
     }
 
-    const file = fileInfo || availableFiles.find(f => f.filename === selectedFile);
-    if (file) {
-        const metadata = file.metadata || {};
-        const total = metadata.total || '?';
-        const operacion = metadata.operacion || 'N/A';
-        const tipo = metadata.tipo || 'N/A';
-        const fecha = file.modified ? new Date(file.modified).toLocaleString('es-CL') : 'N/A';
+    const exec = execInfo || availableExecutions.find(e => e.execution_id === selectedExecution);
+    if (exec) {
+        const total = exec.properties_scraped || 0;
+        const operacion = exec.operacion || 'N/A';
+        const tipo = exec.tipo || 'N/A';
+        const fecha = exec.start_time ? new Date(exec.start_time).toLocaleString('es-CL') : 'N/A';
         infoDiv.textContent = `${total} propiedades | ${operacion} ${tipo} | ${fecha}`;
     }
 }
@@ -296,9 +295,9 @@ function loadProperties(page = 1) {
         ...currentFilters
     });
 
-    // Agregar parámetro de archivo si está seleccionado
-    if (selectedFile) {
-        params.append('file', selectedFile);
+    // Agregar parámetro de ejecución si está seleccionado
+    if (selectedExecution) {
+        params.append('execution_id', selectedExecution);
     }
 
     fetch(`/api/properties?${params}`)
@@ -312,9 +311,7 @@ function loadProperties(page = 1) {
                     renderCards(data.data);
                     renderPaginationCards(data.pagination);
                 }
-                if (data.file_info) {
-                    updateFileResponseInfo(data.file_info);
-                }
+                // Quitamos el file_info logic por ahora ya que no es necesario aquí
             } else {
                 showError('Error al cargar propiedades: ' + data.error);
             }
@@ -324,16 +321,7 @@ function loadProperties(page = 1) {
         });
 }
 
-function updateFileResponseInfo(fileInfo) {
-    const infoDiv = document.getElementById('file-info');
-    if (fileInfo.is_latest) {
-        infoDiv.textContent = `${fileInfo.filename} (Último archivo)`;
-    } else if (fileInfo.filename === 'all') {
-        infoDiv.textContent = 'Todos los archivos combinados';
-    } else {
-        infoDiv.textContent = fileInfo.filename;
-    }
-}
+
 
 function renderTable(properties) {
     const tbodyDesktop = document.getElementById('properties-table-desktop');

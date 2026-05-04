@@ -103,7 +103,8 @@ class TestScrapePropertyDetail:
         
         assert 'caracteristicas' in result
         assert result['caracteristicas']['orientacion'] == 'Norte'
-        assert result['caracteristicas']['año_construccion'] == 2020
+        # Keys are normalized (no accents) to keep Python-safe field names.
+        assert result['caracteristicas']['ano_construccion'] == 2020
         assert result['caracteristicas']['gastos_comunes'] == 45000
         assert result['caracteristicas']['estacionamientos'] == 2
         assert result['caracteristicas']['bodegas'] == 1
@@ -119,14 +120,17 @@ class TestScrapePropertyDetail:
         assert result['publicador']['tipo'] == 'inmobiliaria'
     
     def test_extract_imagenes(self, mock_scraper, sample_detail_html):
-        """Test extracción de URLs de imágenes"""
+        """Test extracción de URLs de imágenes (ahora list[dict] con orden/alt)."""
         mock_scraper.driver.page_source = sample_detail_html
-        
+
         result = mock_scraper.scrape_property_detail('MLC-123', 'https://example.com/123')
-        
+
         assert 'imagenes' in result
         assert len(result['imagenes']) == 2
-        assert 'https://example.com/img1.jpg' in result['imagenes'][0]
+        first = result['imagenes'][0]
+        assert isinstance(first, dict)
+        assert 'https://example.com/img1.jpg' in first['url']
+        assert first['orden'] == 0
     
     def test_extract_fecha_publicacion_relative(self, mock_scraper, sample_detail_html):
         """Test extracción de fecha de publicación (formato relativo)"""
@@ -203,17 +207,18 @@ class TestScrapePropertyDetail:
         
         assert result['publicador']['tipo'] == 'inmobiliaria'
     
-    def test_imagenes_limit_to_10(self, mock_scraper):
-        """Test que limita imágenes a máximo 10"""
-        # Crear HTML con 15 imágenes
+    def test_imagenes_captures_all_without_limit(self, mock_scraper):
+        """Ahora se capturan TODAS las imágenes (sin límite 10) para no perder datos."""
         img_tags = ''.join([f'<img data-src="https://example.com/img{i}.jpg"/>' for i in range(15)])
         html_many_imgs = f"<html><body><div class='ui-pdp-gallery'>{img_tags}</div></body></html>"
-        
+
         mock_scraper.driver.page_source = html_many_imgs
-        
+
         result = mock_scraper.scrape_property_detail('MLC-123', 'https://example.com/123')
-        
-        assert len(result['imagenes']) <= 10
+
+        assert len(result['imagenes']) == 15
+        # Todas las entradas son dicts con url/orden
+        assert all(isinstance(img, dict) and img.get('url') for img in result['imagenes'])
     
     def test_empty_fields_when_no_data(self, mock_scraper):
         """Test que campos vacíos tienen valores por defecto cuando no hay datos"""

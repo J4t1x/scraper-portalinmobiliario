@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
 from database import get_engine, session_scope, setup_database
-from models import Property, Feature, Image, Publisher
+from models import Property, Feature, Image, Publisher, Amenity, Service
+from feature_mapper import normalize_key
 
 logger = logging.getLogger(__name__)
 
@@ -142,17 +143,17 @@ def upsert_property(session: Session, property_data: Dict) -> Property:
         # Update detail fields if provided
         if 'descripcion' in property_data:
             existing.descripcion = property_data['descripcion']
-        
+
         # Update timestamp
         existing.actualizado_en = datetime.utcnow()
-        
+
         prop = existing
     else:
         # Create new property
         logger.info(f"Creating new property: {url}")
-        
+
         precio, moneda = parse_price(property_data.get('precio'))
-        
+
         prop = Property(
             url=url,
             portal_id=property_data.get('id'),
@@ -168,56 +169,211 @@ def upsert_property(session: Session, property_data: Dict) -> Property:
             descripcion=property_data.get('descripcion'),
             scrapeado_en=datetime.utcnow()
         )
-        
+
         session.add(prop)
         session.flush()  # Get the ID without committing
+
+    # -- Extended fields (listado + detalle) -----------------------------
+    _apply_extended_fields(prop, property_data)
     
-    # Handle features
-    if 'caracteristicas' in property_data and isinstance(property_data['caracteristicas'], dict):
-        # Delete existing features
+    # Handle features (raw specs) -- prefer features_raw list, fallback to caracteristicas dict
+    features_raw = property_data.get('features_raw')
+    caracteristicas = property_data.get('caracteristicas')
+
+    if features_raw or caracteristicas:
         session.query(Feature).filter(Feature.property_id == prop.id).delete()
-        
-        # Add new features
-        for key, value in property_data['caracteristicas'].items():
-            if value:  # Only add non-empty values
-                feature = Feature(
-                    property_id=prop.id,
-                    key=key,
-                    value=str(value)
-                )
-                session.add(feature)
-    
-    # Handle images
-    if 'imagenes' in property_data and isinstance(property_data['imagenes'], list):
-        # Delete existing images
+
+    if isinstance(features_raw, list):
+        seen = set()
+        for feat in features_raw:
+            if not isinstance(feat, dict):
+                continue
+            key = (feat.get('key') or '').strip()
+            value = feat.get('value')
+            if not key or value in (None, ''):
+                continue
+            nk = normalize_key(key)
+            if nk in seen:
+                continue
+            seen.add(nk)
+            session.add(Feature(
+                property_id=prop.id,
+                key=key[:100],
+                value=str(value)[:500],
+            ))
+    elif isinstance(caracteristicas, dict):
+        for key, value in caracteristicas.items():
+            if value in (None, ''):
+                continue
+            session.add(Feature(
+                property_id=prop.id,
+                key=str(key)[:100],
+                value=str(value)[:500],
+            ))
+
+    # Handle images (list of dicts or list of str URLs)
+    imagenes = property_data.get('imagenes')
+    if isinstance(imagenes, list):
         session.query(Image).filter(Image.property_id == prop.id).delete()
-        
-        # Add new images
-        for i, img_url in enumerate(property_data['imagenes']):
-            image = Image(
-                property_id=prop.id,
-                url=img_url,
-                es_principal=(i == 0)  # First image is principal
-            )
-            session.add(image)
-    
+        for i, img in enumerate(imagenes):
+            if isinstance(img, dict):
+                url = img.get('url')
+                if not url:
+                    continue
+                session.add(Image(
+                    property_id=prop.id,
+                    url=url,
+                    es_principal=(i == 0),
+                    orden=img.get('orden', i),
+                    alt=img.get('alt'),
+                    resolucion=img.get('resolucion'),
+                ))
+            elif isinstance(img, str):
+                session.add(Image(
+                    property_id=prop.id,
+                    url=img,
+                    es_principal=(i == 0),
+                    orden=i,
+                ))
+
     # Handle publisher
-    if 'publicador' in property_data and isinstance(property_data['publicador'], dict):
-        # Delete existing publisher
+    pub_data = property_data.get('publicador')
+    if isinstance(pub_data, dict) and (pub_data.get('nombre') or pub_data.get('tipo')):
         session.query(Publisher).filter(Publisher.property_id == prop.id).delete()
-        
-        pub_data = property_data['publicador']
-        if pub_data.get('nombre') or pub_data.get('tipo'):
-            publisher = Publisher(
+        session.add(Publisher(
+            property_id=prop.id,
+            nombre=pub_data.get('nombre'),
+            telefono=pub_data.get('telefono'),
+            email=pub_data.get('email'),
+            tipo=pub_data.get('tipo'),
+            logo_url=pub_data.get('logo_url'),
+            perfil_url=pub_data.get('perfil_url'),
+            reputacion=pub_data.get('reputacion'),
+            publicaciones_activas=pub_data.get('publicaciones_activas'),
+            antiguedad_portal=pub_data.get('antiguedad_portal'),
+        ))
+
+    # Handle amenities
+    amenities = property_data.get('amenities')
+    if isinstance(amenities, list):
+        session.query(Amenity).filter(Amenity.property_id == prop.id).delete()
+        seen = set()
+        for a in amenities:
+            nombre = a.get('nombre') if isinstance(a, dict) else str(a)
+            categoria = a.get('categoria') if isinstance(a, dict) else None
+            if not nombre:
+                continue
+            nk = normalize_key(nombre)
+            if nk in seen:
+                continue
+            seen.add(nk)
+            session.add(Amenity(
                 property_id=prop.id,
-                nombre=pub_data.get('nombre'),
-                telefono=pub_data.get('telefono'),
-                email=pub_data.get('email'),
-                tipo=pub_data.get('tipo')
-            )
-            session.add(publisher)
-    
+                nombre=nombre[:200],
+                categoria=categoria,
+            ))
+
+    # Handle services
+    servicios = property_data.get('servicios')
+    if isinstance(servicios, list):
+        session.query(Service).filter(Service.property_id == prop.id).delete()
+        seen = set()
+        for s in servicios:
+            if isinstance(s, dict):
+                nombre = s.get('nombre')
+                incluido = s.get('incluido')
+            else:
+                nombre = str(s)
+                incluido = None
+            if not nombre:
+                continue
+            nk = normalize_key(nombre)
+            if nk in seen:
+                continue
+            seen.add(nk)
+            session.add(Service(
+                property_id=prop.id,
+                nombre=nombre[:200],
+                incluido=incluido,
+            ))
+
     return prop
+
+
+def _apply_extended_fields(prop: Property, data: Dict) -> None:
+    """Apply extended typed fields (from listado + detalle) onto Property.
+
+    Silently ignores keys that don't map to columns. Uses `caracteristicas`
+    dict (field -> parsed value) emitted by the feature mapper.
+    """
+    # Parse relative dates (already ISO strings from scraper)
+    def _parse_date(val):
+        if not val:
+            return None
+        if isinstance(val, datetime):
+            return val
+        for fmt in ('%Y-%m-%d', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S'):
+            try:
+                return datetime.strptime(val, fmt)
+            except (ValueError, TypeError):
+                continue
+        return None
+
+    # Listado-level extras
+    if data.get('precio_anterior') is not None:
+        prop.precio_anterior = data['precio_anterior']
+    if data.get('thumbnail_url'):
+        prop.thumbnail_url = data['thumbnail_url']
+    if data.get('num_fotos') is not None:
+        prop.num_fotos = data['num_fotos']
+    if isinstance(data.get('tags'), list) and data['tags']:
+        prop.tags = data['tags']
+
+    # Detalle-level
+    if data.get('descripcion_html'):
+        prop.descripcion_html = data['descripcion_html']
+    if isinstance(data.get('breadcrumbs'), list) and data['breadcrumbs']:
+        prop.breadcrumbs = data['breadcrumbs']
+    if isinstance(data.get('raw_state'), dict):
+        prop.raw_state = data['raw_state']
+    if data.get('visitas') is not None:
+        prop.visitas = data['visitas']
+    if data.get('estado_publicacion'):
+        prop.estado_publicacion = data['estado_publicacion']
+
+    fp = _parse_date(data.get('fecha_publicacion'))
+    if fp:
+        prop.fecha_publicacion = fp
+    fa = _parse_date(data.get('fecha_actualizacion'))
+    if fa:
+        prop.fecha_actualizacion = fa
+
+    # Coordenadas
+    coords = data.get('coordenadas') or {}
+    if coords.get('lat') is not None:
+        prop.lat = coords['lat']
+    if coords.get('lng') is not None:
+        prop.lng = coords['lng']
+
+    # Características tipadas -> columnas Property
+    caracteristicas = data.get('caracteristicas') or {}
+    if not isinstance(caracteristicas, dict):
+        return
+
+    # Map of caracteristicas_key -> Property attr name. If both match, assign.
+    typed_fields = {
+        'superficie_total', 'superficie_util', 'superficie_terraza',
+        'superficie_terreno', 'dormitorios', 'banos', 'medios_banos',
+        'ambientes', 'estacionamientos', 'bodegas', 'piso', 'pisos_edificio',
+        'gastos_comunes', 'ano_construccion', 'antiguedad', 'orientacion',
+        'vista', 'condicion', 'barrio',
+    }
+    for field, value in caracteristicas.items():
+        if field in typed_fields and value not in (None, ''):
+            try:
+                setattr(prop, field, value)
+            except Exception as e:
+                logger.debug(f"No se pudo asignar {field}={value}: {e}")
 
 
 def persist_properties(properties: List[Dict], database_url: Optional[str] = None) -> dict:

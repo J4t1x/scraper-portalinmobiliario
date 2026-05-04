@@ -6,10 +6,11 @@ and database utilities for the scraper.
 """
 
 import logging
+import time
 from typing import Optional, Dict, Any
 from datetime import datetime
 from contextlib import contextmanager
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session, declarative_base
 from sqlalchemy.exc import OperationalError, SQLAlchemyError, IntegrityError
 from config import Config
@@ -23,6 +24,10 @@ Base = declarative_base()
 _engine: Optional = None
 _SessionLocal: Optional = None
 
+# Connection retry configuration
+MAX_RETRIES = 5
+RETRY_DELAY = 2  # seconds
+
 
 def setup_database(database_url: Optional[str] = None) -> 'Engine':
     """
@@ -35,7 +40,7 @@ def setup_database(database_url: Optional[str] = None) -> 'Engine':
         SQLAlchemy Engine
         
     Raises:
-        OperationalError: If cannot connect to database
+        OperationalError: If cannot connect to database after retries
         ValueError: If DATABASE_URL is not configured
     """
     global _engine, _SessionLocal
@@ -46,27 +51,53 @@ def setup_database(database_url: Optional[str] = None) -> 'Engine':
     if not database_url:
         raise ValueError("DATABASE_URL is not configured. Please set it in .env or environment variables.")
     
+    # Log connection info (mask password)
     try:
-        _engine = create_engine(
-            database_url,
-            pool_size=Config.DB_POOL_SIZE,
-            max_overflow=Config.DB_MAX_OVERFLOW,
-            pool_timeout=Config.DB_POOL_TIMEOUT,
-            pool_pre_ping=True,  # Verify connections before using
-            echo=False  # Set to True for SQL query logging
-        )
-        
-        _SessionLocal = sessionmaker(bind=_engine, autocommit=False, autoflush=False)
-        
-        logger.info(f"Database engine created successfully for: {database_url.split('@')[1] if '@' in database_url else 'local'}")
-        return _engine
-        
-    except OperationalError as e:
-        logger.error(f"Failed to connect to database: {e}")
-        raise
-    except Exception as e:
-        logger.error(f"Error creating database engine: {e}")
-        raise
+        masked_url = database_url.split('@')[1] if '@' in database_url else 'local'
+    except Exception:
+        masked_url = 'unknown'
+    
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            _engine = create_engine(
+                database_url,
+                pool_size=Config.DB_POOL_SIZE,
+                max_overflow=Config.DB_MAX_OVERFLOW,
+                pool_timeout=Config.DB_POOL_TIMEOUT,
+                pool_pre_ping=True,  # Verify connections before using
+                echo=False  # Set to True for SQL query logging
+            )
+            
+            # Test the connection
+            with _engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            
+            _SessionLocal = sessionmaker(bind=_engine, autocommit=False, autoflush=False)
+            
+            logger.info(f"Database engine created successfully for: {masked_url}")
+            return _engine
+            
+        except OperationalError as e:
+            if attempt < MAX_RETRIES:
+                logger.warning(
+                    f"Database connection attempt {attempt}/{MAX_RETRIES} failed for {masked_url}: {e}. "
+                    f"Retrying in {RETRY_DELAY}s..."
+                )
+                time.sleep(RETRY_DELAY * attempt)  # Exponential backoff
+            else:
+                logger.error(
+                    f"Failed to connect to database after {MAX_RETRIES} attempts. "
+                    f"URL: {masked_url}. Error: {e}\n"
+                    f"Troubleshooting:\n"
+                    f"  - Is PostgreSQL running? Check: docker ps\n"
+                    f"  - Is the port correct? DATABASE_URL should match docker-compose port mapping\n"
+                    f"  - Inside container: use 'postgres:5432'\n"
+                    f"  - Outside container: use 'localhost:4420'"
+                )
+                raise
+        except Exception as e:
+            logger.error(f"Error creating database engine: {e}")
+            raise
 
 
 def get_engine() -> 'Engine':
@@ -130,12 +161,48 @@ def test_connection() -> bool:
     try:
         engine = get_engine()
         with engine.connect() as conn:
-            conn.execute("SELECT 1")
+            conn.execute(text("SELECT 1"))
         logger.info("Database connection test successful")
         return True
     except Exception as e:
         logger.error(f"Database connection test failed: {e}")
         return False
+
+
+def health_check() -> Dict[str, Any]:
+    """
+    Perform a health check on the database.
+    
+    Returns:
+        Dict with health check results including status, latency, and version
+    """
+    start = time.time()
+    try:
+        engine = get_engine()
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT version()"))
+            version = result.scalar()
+            
+            result = conn.execute(text(
+                "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'"
+            ))
+            table_count = result.scalar()
+        
+        latency_ms = round((time.time() - start) * 1000, 2)
+        
+        return {
+            'status': 'healthy',
+            'latency_ms': latency_ms,
+            'version': version,
+            'tables': table_count
+        }
+    except Exception as e:
+        latency_ms = round((time.time() - start) * 1000, 2)
+        return {
+            'status': 'unhealthy',
+            'latency_ms': latency_ms,
+            'error': str(e)
+        }
 
 
 def close_database() -> None:

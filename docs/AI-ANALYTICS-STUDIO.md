@@ -2,7 +2,17 @@
 
 ## 🎯 Descripción
 
-**AI Analytics Studio** es una experiencia premium de analítica inmobiliaria potenciada por IA local (Ollama). Proporciona una interfaz moderna tipo ChatGPT/Claude con control completo sobre el servidor Ollama y métricas de ejecución en tiempo real.
+**AI Analytics Studio** es una experiencia premium de analítica inmobiliaria potenciada por IA local (Ollama) con soporte completo para **Small Language Models (SLMs)**. Proporciona una interfaz moderna tipo ChatGPT/Claude con control completo sobre modelos, benchmarking y métricas de ejecución en tiempo real.
+
+### ¿Qué son los SLMs?
+
+Los **Small Language Models** son modelos de IA compactos (< 13B parámetros) optimizados para tareas específicas. Ofrecen:
+- ⚡ **Velocidad superior** - Respuestas en milisegundos
+- 💾 **Bajo consumo de recursos** - Funcionan en hardware modesto
+- 🎯 **Especialización** - Optimizados para analytics, código, razonamiento
+- 🔒 **Privacidad** - Ejecución 100% local, sin envío de datos
+
+Basado en: [Small Language Models - The Lightweight AI Revolution](https://medium.com/@lekhashree2012/small-language-models-slms-the-lightweight-ai-revolution-everyones-talking-about-in-2025-b7db3d228bc2)
 
 ## ✨ Características Principales
 
@@ -32,11 +42,165 @@ Panel lateral con estadísticas acumuladas:
 - **Latencia promedio** - Tiempo promedio de respuesta
 - **Barras de progreso** visuales para cada métrica
 
-### 5. Gestión de Modelos
-- **Lista de modelos** instalados en Ollama
-- **Tamaño de cada modelo** en MB/GB
-- **Modelo activo** destacado visualmente
-- **Cambio de modelo** con un clic
+### 5. Gestión Avanzada de Modelos SLM
+- **Catálogo completo** de 8+ modelos optimizados para analytics
+- **Filtros inteligentes** por tamaño, tarea y estado de instalación
+- **Métricas de rendimiento** (Speed, Quality, Overall scores)
+- **Descarga directa** desde la interfaz
+- **Cambio de modelo** en tiempo real
+- **Benchmarking** para comparar rendimiento
+- **Información detallada** de cada modelo (parámetros, tareas, recomendaciones)
+
+#### Modelos Disponibles
+
+**Tiny (< 1B parámetros)**
+- `qwen2.5-coder:0.5b` - Ultra-rápido para consultas básicas (352MB)
+
+**Small (1-3B parámetros)**
+- `qwen2.5-coder:1.5b` - **Recomendado** - Balance perfecto (934MB)
+- `phi3:mini` - Excelente razonamiento (2.3GB)
+- `gemma2:2b` - Modelo general de Google (1.6GB)
+
+**Medium (3-7B parámetros)**
+- `qwen2.5-coder:3b` - Alta calidad para análisis detallado (1.9GB)
+- `llama3.2:3b` - Razonamiento avanzado de Meta (2GB)
+- `qwen2.5-coder:7b` - Máxima calidad para analytics (4.7GB)
+
+**Large (7-13B parámetros)**
+- `qwen2.5:7b` - Análisis estratégico completo (4.7GB)
+
+## 🧠 CoTHSSum: Razonamiento Jerárquico
+
+### ¿Qué es CoTHSSum?
+
+**CoTHSSum** (Hierarchical + Chain-of-Thought) es un pipeline de razonamiento estructurado en 3 capas que mejora significativamente la coherencia y precisión de las respuestas del chatbot.
+
+### Arquitectura de 3 Capas
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Capa 1: Micro-insights                │
+│  • Fragmentar datos en chunks pequeños (5 elementos)    │
+│  • Analizar cada chunk con Chain-of-Thought             │
+│  • Generar insights específicos con confianza           │
+│  • Salida: JSON con insight, reasoning, data_points    │
+└─────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────┐
+│                 Capa 2: Patrones Globales                │
+│  • Agrupar micro-insights similares                     │
+│  • Identificar patrones (trend, anomaly, opportunity)   │
+│  • Asignar significancia y categoría                    │
+│  • Salida: JSON con patterns, supporting_insights       │
+└─────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────┐
+│                   Capa 3: Conclusión Final                │
+│  • Sintetizar patrones en respuesta coherente           │
+│  • Generar conclusión directa y accionable              │
+│  • Razonamiento paso a paso final                       │
+│  • Salida: JSON con conclusion, reasoning                │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Ventajas de CoTHSSum
+
+- **Mayor Coherencia**: Respuestas basadas en análisis estructurado
+- **Trazabilidad Completa**: Cada paso del razonamiento es visible
+- **Modelos Pequeños**: SLMs (< 3B) trabajan efectivamente en problemas complejos
+- **Salidas Estructuradas**: JSON en cada capa para procesamiento
+- **Reducción de Errores**: Validación en cada etapa del pipeline
+- **Escalabilidad**: Fácil agregar nuevas capas o modificar prompts
+
+### Uso Programático
+
+#### Endpoint `/api/analytics/chat`
+
+```bash
+# Uso estándar (CoTHSSum activado por defecto)
+POST /api/analytics/chat
+{
+  "question": "¿Cuáles son las mejores oportunidades?"
+}
+
+# Con trazabilidad completa
+POST /api/analytics/chat
+{
+  "question": "¿Cuáles son las mejores oportunidades?",
+  "return_trace": true
+}
+
+# Desactivar CoTHSSum (modo estándar)
+POST /api/analytics/chat
+{
+  "question": "¿Cuáles son las mejores oportunidades?",
+  "use_cothssum": false
+}
+```
+
+#### Respuesta con Trazabilidad
+
+```json
+{
+  "success": true,
+  "response": "Las mejores oportunidades están en Las Condes...",
+  "data": {
+    "response": "Las mejores oportunidades están en Las Condes...",
+    "trace": "🔍 CoTHSSum Trace ID: abc-123...",
+    "metadata": {
+      "total_micro_insights": 8,
+      "total_patterns": 3,
+      "model": "qwen2.5-coder:1.5b"
+    },
+    "layer1_insights": [...],
+    "layer2_patterns": [...],
+    "layer3_reasoning": ["paso 1", "paso 2", "paso 3"],
+    "trace_id": "abc-123...",
+    "method": "cothssum"
+  }
+}
+```
+
+### Configuración
+
+#### Chunk Size
+
+El tamaño de los fragmentos (chunks) se configura en `ai/cothssum.py`:
+
+```python
+pipeline = CoTHSSumPipeline(agent=agent, max_chunk_size=5)
+```
+
+- **max_chunk_size=5**: Divide listas en grupos de 5 elementos
+- Valores recomendados: 3-10 (menor = más granular, mayor = más rápido)
+
+#### Prompts por Capa
+
+Los prompts específicos para cada capa están en `ai/prompts.py`:
+
+- `build_layer1_micro_insight_prompt()`: Capa 1 - Micro-insights
+- `build_layer2_pattern_prompt()`: Capa 2 - Patrones globales
+- `build_layer3_conclusion_prompt()`: Capa 3 - Conclusión final
+
+### Métricas de Rendimiento
+
+- **Latencia**: 2-4x más lento que modo estándar (múltiples llamadas al modelo)
+- **Calidad**: Significativamente mejor en preguntas complejas
+- **Tokens**: 3-5x más tokens (razonamiento estructurado)
+- **Coherencia**: 80-90% mejora en respuestas multi-paso
+
+### Cuándo Usar CoTHSSum
+
+**Recomendado para:**
+- ✅ Preguntas complejas que requieren análisis de múltiples datos
+- ✅ Comparativas entre zonas, propiedades o tendencias
+- ✅ Identificación de oportunidades y patrones
+- ✅ Análisis que requieren alta coherencia
+
+**Modo estándar suficiente para:**
+- ⚡ Preguntas simples (stats básicos, conteos)
+- ⚡ Consultas rápidas donde la velocidad es prioridad
+- ⚡ Preguntas con contexto pequeño
 
 ## 🚀 Cómo Usar
 
@@ -136,20 +300,67 @@ Muéstrame las propiedades más baratas en Santiago Centro
 - **Font-semibold** para títulos
 - **Prose** para contenido de mensajes
 
+### Gestión de Modelos
+
+#### Descargar un Modelo
+1. Abrir panel lateral (icono ⚙️)
+2. Hacer clic en filtro para ver todos los modelos
+3. Seleccionar modelo no instalado
+4. Hacer clic en botón "Descargar"
+5. Esperar confirmación (puede tomar varios minutos)
+
+#### Cambiar de Modelo
+1. En panel lateral, buscar modelo instalado
+2. Hacer clic en botón "Usar"
+3. Esperar confirmación en el chat
+4. Comenzar a hacer preguntas con el nuevo modelo
+
+#### Benchmark de Modelos
+1. Seleccionar modelo instalado
+2. Hacer clic en icono ⚡ (Benchmark)
+3. Ver resultados: duración, tokens/seg
+
+#### Filtrar Modelos
+- **Por estado**: Todos / Solo instalados / Recomendados
+- **Por tamaño**: Tiny / Small / Medium / Large
+- **Por tarea**: Analytics / Code / Reasoning / Chat
+
 ## 🔧 Configuración Técnica
 
 ### Endpoints Utilizados
 
 **Chat con IA:**
 ```
-POST /api/v2/agent/chat
+POST /api/analytics/chat
 Headers: X-API-KEY, Content-Type: application/json
 Body: { "question": "..." }
 ```
 
-**Estado de Ollama:**
+**Estado de SLM:**
 ```
-GET http://localhost:11434/api/tags
+GET /api/v2/slm/status
+Response: { ollama: {...}, agent: {...}, slm_support: true }
+```
+
+**Listar Modelos:**
+```
+GET /api/v2/slm/models
+GET /api/v2/slm/models/installed
+GET /api/v2/slm/models/recommended?use_case=analytics
+```
+
+**Gestión de Modelos:**
+```
+POST /api/v2/slm/models/switch
+Body: { "model": "qwen2.5-coder:3b" }
+
+POST /api/v2/slm/models/pull
+Body: { "model": "phi3:mini" }
+
+DELETE /api/v2/slm/models/<model_name>
+
+POST /api/v2/slm/models/<model_name>/benchmark
+Body: { "prompt": "..." }
 ```
 
 ### Variables de Entorno

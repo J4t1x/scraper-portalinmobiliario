@@ -209,6 +209,25 @@ cmd_db() {
     docker exec -it $CONTAINER_NAME psql -U scraper -d portalinmobiliario
 }
 
+cmd_init_db() {
+    log_header "🗄️ Inicializar Base de Datos"
+    
+    # Verificar si estamos usando contenedor único o PostgreSQL separado
+    if docker ps | grep -q "portalinmobiliario-db"; then
+        log_info "Detectado contenedor PostgreSQL separado (portalinmobiliario-db)"
+        log_info "Ejecutando script de inicialización..."
+        ./init-db-local.sh
+    elif docker ps | grep -q $CONTAINER_NAME; then
+        log_info "Detectado contenedor único MVP"
+        log_info "Ejecutando script dentro del contenedor..."
+        docker exec -it $CONTAINER_NAME python /app/init_db.py
+    else
+        log_error "No se encontró ningún contenedor activo"
+        log_info "Asegúrate de que PostgreSQL esté corriendo"
+        exit 1
+    fi
+}
+
 cmd_help() {
     log_header "🚀 Portal Inmobiliario Scraper - Gestión"
     
@@ -231,6 +250,7 @@ cmd_help() {
     echo "Acceso:"
     echo "  shell              - Abrir bash en el contenedor"
     echo "  db                 - Abrir psql (PostgreSQL)"
+    echo "  init-db            - Inicializar tablas en la base de datos"
     echo ""
     echo "Servicios:"
     echo "  services [action] [service]"
@@ -283,6 +303,9 @@ main() {
             ;;
         db|psql)
             cmd_db
+            ;;
+        init-db)
+            cmd_init_db
             ;;
         help|--help|-h)
             cmd_help

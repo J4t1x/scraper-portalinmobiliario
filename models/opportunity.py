@@ -14,7 +14,7 @@ class Opportunity(Base):
     __tablename__ = 'opportunities'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    property_id = Column(String(50), ForeignKey('properties.id'), nullable=False)
+    property_id = Column(Integer, ForeignKey('properties.id'), nullable=False)
     tipo_oportunidad = Column(String(50), nullable=False)
     score = Column(Numeric(5, 2), nullable=False)
     precio_m2_propiedad = Column(Numeric(12, 2))

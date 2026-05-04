@@ -1,24 +1,32 @@
 # 🏠 Portal Inmobiliario Scraper + Analytics MVP
 
-[![Estado](https://img.shields.io/badge/estado-mvp%20en%20desarrollo-yellow)](https://github.com)
+[![Estado](https://img.shields.io/badge/estado-mvp%20completado-brightgreen)](https://github.com)
+[![Versión](https://img.shields.io/badge/versión-2.0.0--MVP%20Analytics-blue)](https://github.com)
 [![Python](https://img.shields.io/badge/python-3.14.3-blue)](https://www.python.org/)
-[![Última actualización](https://img.shields.io/badge/última%20actualización-abril%202026-orange)](https://github.com)
+[![Última actualización](https://img.shields.io/badge/última%20actualización-19%20abril%202026-orange)](https://github.com)
 
 Sistema completo de scraping, analítica y detección de oportunidades inmobiliarias con IA integrada.
 
 **🎯 MVP:** Scraper + Analítica (pandas) + Dashboard + Agente IA (Ollama) en un solo contenedor Docker.
 
+> **🌐 [Ver todos los servicios y URLs disponibles →](SERVICIOS.md)**
+
 ## 📊 Estado del Proyecto
 
-### Fase Actual: MVP Analytics Implementado ✅
+### Fase Actual: ✅ MVP Analytics Completado + 🚧 Optimización de Contenedor
 
-- ✅ **Scraper funcional:** 144+ propiedades scrapeadas en pruebas
-- ✅ **Base de datos:** PostgreSQL con scheduler automatizado
-- ✅ **Dashboard web:** Flask + TailwindCSS + BI básico
+**Versión:** `2.0.0-MVP Analytics` · **Specs completadas:** 15/39 (38%) · **Coverage tests:** 73%
+
+- ✅ **Scraper funcional:** Selenium 4.18.1 + ChromeDriver 146 (144+ propiedades scrapeadas)
+- ✅ **Base de datos:** PostgreSQL 15 + SQLAlchemy + Alembic (migraciones 001-004)
+- ✅ **Dashboard web:** Flask + TailwindCSS + Chart.js con KPIs y BI
 - ✅ **Analítica MVP:** Pipeline pandas + detección de oportunidades (SPEC-MVP-ANALYTICS-001)
-- ✅ **Agente IA:** Ollama integrado en contenedor con qwen2.5-coder:1.5b pre-descargado
+- ✅ **AI Analytics Studio:** Chat con streaming + caché de respuestas (Ollama qwen2.5-coder:1.5b)
 - ✅ **Contenedor único MVP:** PostgreSQL + Python + Chrome + Ollama + Supervisor
-- 🚧 **Testing:** Validación de pipeline completo pendiente
+- ✅ **Dashboard PostgreSQL:** Migración completa JSON → PostgreSQL
+- ✅ **Tracking de ejecuciones:** `ScraperExecution` + `ScraperLog` con persistencia en BD
+- ✅ **Scheduler automatizado:** APScheduler + 5 jobs preconfigurados (SPEC-011, SPEC-012)
+- 🚧 **Optimización:** PRD activo para -45% RAM, -45% imagen, -50% costos (6 días, 4 fases)
 
 ### Servicios en Contenedor MVP
 
@@ -45,13 +53,25 @@ El contenedor único incluye 4 servicios gestionados por Supervisor:
 - ✅ **API de oportunidades:** Endpoints REST para consultar y ejecutar analítica
 - ✅ **Contenedor único:** Dockerfile.mvp con supervisord para múltiples procesos
 - ✅ **Modelos de datos:** Opportunity, AnalyticsCache + migración Alembic 003
+- ✅ **Dashboard PostgreSQL:** Migración completa de JSON a PostgreSQL (Alembic 004)
+- ✅ **Tracking de ejecuciones:** ScraperExecution + ScraperLog con persistencia
+- ✅ **Logs en tiempo real:** SocketIO + BD para logs que persisten al cambiar ventana
 
-### Próximos Pasos (Post-MVP)
+### Próximos Pasos
 
-- � **Dashboard de oportunidades:** Página web para visualización
-- 🔜 **Testing completo:** Tests unitarios y de integración
-- 🔜 **Separar PostgreSQL:** Migrar a contenedor independiente
-- 🔜 **Notificaciones:** Alertas de nuevas oportunidades
+**🚧 Optimización de Contenedor (en progreso — ver `docs/specs/PRD-OPTIMIZACION-CONTENEDOR.md`)**
+- 🚧 Chrome headless optimizado + PostgreSQL tuning (Fase 1)
+- 🚧 Multi-stage Dockerfile + Chromium + Redis cache + Lazy Ollama (Fase 2)
+- 🚧 Migración a Alpine Linux + docker-compose profiles (Fase 3)
+- 🚧 Load testing y deploy a producción (Fase 4)
+
+**🔜 Post-Optimización**
+- 🔜 Dashboard de oportunidades (visualización dedicada)
+- 🔜 Notificaciones automáticas de nuevas oportunidades
+- 🔜 Tests de integración (requiere downgrade a Python 3.11/3.12)
+- 🔜 CI/CD con GitHub Actions
+- 🔜 Separar PostgreSQL a contenedor independiente
+- 🔜 Migración API REST a FastAPI
 
 ## �📋 Características
 
@@ -68,18 +88,21 @@ El contenedor único incluye 4 servicios gestionados por Supervisor:
 - ✅ **Workflow Cascade:** Automatización completa con `/portalinmobiliario-dev`
 
 ### Dashboard Web
-- ✅ **Interfaz Flask:** Dashboard web moderno con TailwindCSS
+- ✅ **Interfaz Flask:** Dashboard web moderno con TailwindCSS + Chart.js
 - ✅ **Autenticación:** Sistema de login con roles (Admin/Viewer)
 - ✅ **Control del Scraper:** Ejecutar scraping desde la interfaz web
-- ✅ **Visualización de Datos:** Explorador de archivos JSON/CSV con tablas interactivas
-- ✅ **Business Intelligence:** Gráficos, KPIs y estadísticas descriptivas
-- ✅ **AI Analytics Studio:** Experiencia premium de analítica con IA
+- ✅ **Visualización de Datos:** Tablas interactivas desde PostgreSQL + vista de detalle
+- ✅ **Business Intelligence:** KPIs dinámicos, gráficos (pie/bar) y estadísticas descriptivas
+- ✅ **AI Analytics Studio:** Chat premium con IA (streaming + caché)
   - Chat inteligente tipo ChatGPT con Ollama integrado
+  - Streaming de respuestas en tiempo real
+  - Caché de respuestas frecuentes
   - Panel de control de servidor Ollama en tiempo real
   - Métricas de ejecución (latencia, tokens, modelo)
   - Gestión de modelos disponibles
   - Preguntas rápidas predefinidas
-- ✅ **Logs en Tiempo Real:** WebSocket para monitoreo en vivo
+- ✅ **Oportunidades:** API REST + scoring 0-100 + detección de outliers
+- ✅ **Logs en Tiempo Real:** WebSocket (SocketIO) + persistencia en BD
 
 ## 🚀 Instalación
 
@@ -130,10 +153,16 @@ ollama pull qwen2.5-coder:3b
 
 ### Opción 2: Docker 🐳 (Recomendado para Producción)
 
-#### 1. Build de la imagen
+> **⚠️ IMPORTANTE:** Usar `Dockerfile.v2` y `docker-compose.v2.yml` para evitar problemas con ChromeDriver.
+
+#### 1. Build de la imagen (v2 - Estable)
 
 ```bash
-docker build -t portalinmobiliario:latest .
+# Build optimizado con Chromium del sistema
+docker build -f Dockerfile.v2 -t portalinmobiliario:v2 .
+
+# O usar el script de verificación
+./scripts/build-and-test.sh
 ```
 
 #### 2. Ejecutar con Docker
@@ -141,18 +170,38 @@ docker build -t portalinmobiliario:latest .
 ```bash
 docker run --rm \
   -v $(pwd)/output:/app/output \
-  portalinmobiliario:latest \
+  portalinmobiliario:v2 \
   python main.py --operacion venta --tipo departamento --max-pages 2
 ```
 
-#### 3. O usar Docker Compose (incluye PostgreSQL)
+#### 3. O usar Docker Compose v2 (incluye PostgreSQL)
 
 ```bash
-docker-compose up -d
-docker-compose run --rm scraper python main.py --operacion venta --tipo departamento
+# Levantar PostgreSQL
+docker-compose -f docker-compose.v2.yml up -d postgres
+
+# Ejecutar scraping
+docker-compose -f docker-compose.v2.yml run --rm scraper \
+  python main.py --operacion venta --tipo departamento --max-pages 5
+
+# Con dashboard
+docker-compose -f docker-compose.v2.yml --profile dashboard up -d
 ```
 
-**📖 Ver [docs/deployment/DOCKER.md](docs/deployment/DOCKER.md) para documentación completa de Docker y Railway.**
+**📖 Ver [docs/deployment/DOCKER-V2.md](docs/deployment/DOCKER-V2.md) para documentación completa de Docker v2.**
+
+### 🔗 Acceso Rápido a Servicios
+
+Una vez levantados los contenedores, accede a:
+
+| Servicio | URL | Descripción |
+|----------|-----|-------------|
+| 🎨 **Dashboard** | http://localhost:4421 | Interfaz web principal |
+| 🗄️ **PostgreSQL** | `localhost:4420` | Base de datos |
+| 🤖 **Ollama** | http://localhost:4423 | IA (requiere profile `ai`) |
+| 🔧 **Adminer** | http://localhost:4424 | Gestión BD (requiere profile `admin`) |
+
+> **📋 [Ver guía completa de servicios →](SERVICIOS.md)**
 
 ## 💻 Uso
 
@@ -475,7 +524,7 @@ USER_AGENT=Mozilla/5.0...   # User agent personalizado
 - Implementa delays entre requests para evitar bloqueos
 - Usa un User-Agent realista
 
-## � Deployment en Railway
+## 🚀 Deployment en Railway
 
 Este proyecto está listo para desplegarse en Railway con PostgreSQL:
 
@@ -493,7 +542,12 @@ git push origin main
 
 # 3. Deploy automático
 # Railway desplegará automáticamente en cada push a main
+
+# 4. ⚠️ IMPORTANTE: Inicializar base de datos (solo primera vez)
+railway run bash railway-init-db.sh
 ```
+
+**⚠️ Paso crítico:** Después del primer deploy, debes ejecutar `railway-init-db.sh` para crear las tablas en PostgreSQL. Sin este paso, la aplicación fallará con errores de "tabla no existe".
 
 **📖 Ver [docs/deployment/DOCKER.md](docs/deployment/DOCKER.md) para guía completa de deployment en Railway.**
 
@@ -564,30 +618,28 @@ DATABASE_URL=postgresql://user:password@localhost:5432/scraper_db
 - ✅ Scheduler (APScheduler) para scraping automático
 - ✅ Dashboard web con Flask
 
-### 🚧 Fase 3 - MVP Analítica (En Desarrollo - Abril 2026)
+### ✅ Fase 3 - MVP Analítica (Completada - Abril 2026)
 **Objetivo:** Sistema completo de analítica y detección de oportunidades en un solo contenedor
 
-- 🚧 **Contenedor único:** PostgreSQL + Python + Chrome + Ollama
-- 🚧 **Analítica con pandas:**
-  - Cálculo de precio/m² automático
-  - Promedios y estadísticas por comuna
-  - Detección de outliers y tendencias
-- 🚧 **Detección de oportunidades:**
-  - Propiedades bajo promedio (< μ - 1σ)
-  - Scoring automático (0-100)
-  - Clasificación: excelente, muy buena, buena, moderada
-- 🚧 **Agente IA ligero:**
-  - Integración con Ollama (qwen2.5-coder:1.5b)
-  - Interpretación de insights en lenguaje natural
-  - Chat para consultas sobre oportunidades
-- 🚧 **Dashboard de oportunidades:**
-  - Visualización de top oportunidades
-  - Filtros por comuna, tipo, score
-  - Gráficos de precio/m² por comuna
-  - KPIs de inversión
+- ✅ **Contenedor único:** PostgreSQL + Python + Chrome + Ollama (supervisord)
+- ✅ **Analítica con pandas:** precio/m², promedios por comuna, detección de outliers
+- ✅ **Detección de oportunidades:** < μ - 1σ, scoring 0-100, clasificación
+- ✅ **Agente IA:** Ollama (qwen2.5-coder:1.5b) con streaming y caché
+- ✅ **API REST de oportunidades:** `/api/analytics/*`, `/api/opportunities/*`
+- � **Dashboard de oportunidades (visualización dedicada):** pendiente
 
 **📖 Ver [docs/MVP-ARCHITECTURE.md](docs/MVP-ARCHITECTURE.md) para arquitectura completa**  
 **📖 Ver [docs/specs/SPEC-MVP-001.md](docs/specs/SPEC-MVP-001.md) para especificación técnica**
+
+### 🚧 Fase 3.5 - Optimización de Contenedor (En Progreso - Abril 2026)
+**Objetivo:** -45% tamaño imagen, -45% RAM, -50% costos ($12/mes → $6/mes) · 6 días · 4 fases
+
+- 🚧 **Fase 1 — Quick Wins:** Chrome tuning, PostgreSQL tuning, log rotation, Gunicorn
+- 🔜 **Fase 2 — Refactoring:** Multi-stage Dockerfile, Chromium, Redis cache, Flask-Compress, Lazy Ollama
+- 🔜 **Fase 3 — Arquitectura modular:** Alpine Linux, docker-compose profiles, servicios core/optional
+- 🔜 **Fase 4 — Testing y Deploy:** Load testing, staging, producción
+
+**📖 Ver [docs/specs/PRD-OPTIMIZACION-CONTENEDOR.md](docs/specs/PRD-OPTIMIZACION-CONTENEDOR.md) para el plan completo**
 
 ### 🚀 Fase 4 - Pro (Futuro)
 - [ ] Separar PostgreSQL en contenedor independiente
@@ -626,21 +678,29 @@ Toda la documentación del proyecto está organizada en la carpeta `docs/`:
 ### Documentación Principal
 
 - **[docs/README.md](docs/README.md)** - Índice maestro de documentación
-- **[docs/MVP-ARCHITECTURE.md](docs/MVP-ARCHITECTURE.md)** - 🆕 Arquitectura MVP completa
+- **[docs/INDEX.md](docs/INDEX.md)** - Índice visual con mapa de navegación
+- **[docs/MVP-ARCHITECTURE.md](docs/MVP-ARCHITECTURE.md)** - Arquitectura MVP completa
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Arquitectura técnica del sistema
 - **[docs/STATUS.md](docs/STATUS.md)** - Estado actual del proyecto
 - **[docs/CONVENTIONS.md](docs/CONVENTIONS.md)** - Convenciones de código
+- **[docs/AI-ANALYTICS-STUDIO.md](docs/AI-ANALYTICS-STUDIO.md)** - Documentación AI Analytics Studio
+- **[docs/OLLAMA-INTEGRATION.md](docs/OLLAMA-INTEGRATION.md)** - Integración con Ollama
+- **[docs/LOGGING.md](docs/LOGGING.md)** - Sistema de logging
 
 ### Guías y Deployment
 
 - **[docs/guides/QUICKSTART.md](docs/guides/QUICKSTART.md)** - Guía de inicio rápido
+- **[docs/MVP-QUICKSTART.md](docs/MVP-QUICKSTART.md)** - Quickstart MVP (contenedor único)
 - **[docs/deployment/DOCKER.md](docs/deployment/DOCKER.md)** - Guía completa de Docker
 - **[docs/deployment/QUICKSTART-DOCKER.md](docs/deployment/QUICKSTART-DOCKER.md)** - Docker rápido
 
 ### Especificaciones
 
 - **[docs/specs/prd.md](docs/specs/prd.md)** - Product Requirements Document
-- **[docs/specs/SPEC-MVP-001.md](docs/specs/SPEC-MVP-001.md)** - 🆕 Especificación MVP Analítica
+- **[docs/specs/SPEC-MVP-001.md](docs/specs/SPEC-MVP-001.md)** - Especificación MVP Analítica
+- **[docs/specs/PRD-OPTIMIZACION-CONTENEDOR.md](docs/specs/PRD-OPTIMIZACION-CONTENEDOR.md)** - 🔥 PRD Optimización activa
+- **[docs/specs/SPEC-NOTIFICATIONS-001.md](docs/specs/SPEC-NOTIFICATIONS-001.md)** - Spec notificaciones (pendiente)
+- **[docs/specs/SPECS-RESUMEN.md](docs/specs/SPECS-RESUMEN.md)** - Resumen de specs
 
 ### Workflows Cascade
 
@@ -651,15 +711,18 @@ Toda la documentación del proyecto está organizada en la carpeta `docs/`:
 ## 🔧 Stack Tecnológico
 
 - **Python:** 3.14.3
-- **Scraping:** Selenium 4.18.1 + BeautifulSoup4 4.12.3
+- **Scraping:** Selenium 4.18.1 + BeautifulSoup4 4.12.3 + lxml 5.1.0
 - **WebDriver:** ChromeDriver 146.0.7680.165 (gestión automática)
-- **Parsing:** lxml 5.1.0
-- **Config:** python-dotenv 1.0.1
-- **Alternativa:** requests 2.31.0 (scraper.py)
-- **IA Local:** Ollama + qwen2.5-coder:3b (Agente de Analítica)
-- **Docker:** Dockerfile + docker-compose con PostgreSQL
-- **Deploy:** Railway-ready con railway.json
-- **Automatización:** Workflows Cascade en `.windsurf/`
+- **Web:** Flask 3.0.2 + Flask-SocketIO + TailwindCSS + Chart.js
+- **BD:** PostgreSQL 15 + SQLAlchemy + Alembic (migraciones 001-004)
+- **Analítica:** pandas + numpy (pipeline de oportunidades)
+- **IA Local:** Ollama + qwen2.5-coder:1.5b (streaming + caché)
+- **Scheduler:** APScheduler con persistencia en PostgreSQL
+- **Orquestación:** Supervisord (4 servicios en contenedor único)
+- **Docker:** Dockerfile.mvp + docker-compose con perfiles (`ai`, `admin`, `dashboard`)
+- **Deploy:** Railway-ready con `railway.json`
+- **Testing:** pytest (73% coverage)
+- **Automatización:** Workflows Cascade en `.windsurf/` (SDD + AI Dev Engine)
 
 ## �📧 Contacto
 

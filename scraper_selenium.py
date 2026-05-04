@@ -11,8 +11,27 @@ from bs4 import BeautifulSoup
 from config import Config
 from validator import DataValidator, validate_properties_batch
 from logger_config import get_logger, log_performance
+from feature_mapper import normalize_key, map_feature, parse_int, parse_money
 
 logger = get_logger(__name__)
+
+
+# Amenity keywords used to classify extra specs/services from the PDP.
+# Matching is done on the normalized key (lowercase, no accents).
+AMENITY_KEYWORDS = {
+    'piscina', 'gimnasio', 'quincho', 'sala_de_eventos', 'salon_de_eventos',
+    'lavanderia', 'porteria', 'porteria_24_horas', 'areas_verdes', 'seguridad',
+    'ascensor', 'ascensores', 'juegos_infantiles', 'sala_multiuso', 'cowork',
+    'rooftop', 'bicicletero', 'sala_de_cine', 'spa', 'sauna', 'jacuzzi',
+    'cancha_de_tenis', 'cancha_de_futbol', 'conserjeria', 'control_de_acceso',
+    'citofono', 'terraza', 'jardin', 'patio', 'balcon', 'logia',
+    'calefaccion', 'aire_acondicionado', 'camaras_de_seguridad',
+}
+
+SERVICE_KEYWORDS = {
+    'agua_caliente', 'gas', 'internet', 'cable', 'television_por_cable',
+    'telefono', 'luz', 'electricidad',
+}
 
 
 def get_optimized_chrome_options(headless: bool = True) -> Options:
@@ -202,75 +221,162 @@ class PortalInmobiliarioSeleniumScraper:
         
         return properties
     
-    def _extract_property_data(self, listing) -> Optional[Dict[str, str]]:
-        """Extrae datos de una propiedad"""
+    # Mapeo de palabras clave en el headline (en plural/singular, sin acentos) → tipo canónico.
+    # Usado por _infer_tipo para clasificar cada propiedad por su contenido real, no por el parámetro CLI.
+    _HEADLINE_TIPO_KEYWORDS = [
+        ('departamento', 'departamento'),
+        ('casa', 'casa'),
+        ('oficina', 'oficina'),
+        ('local comercial', 'local-comercial'),
+        ('local', 'local-comercial'),
+        ('bodega', 'bodega'),
+        ('estacionamiento', 'estacionamiento'),
+        ('parcela', 'parcela'),
+        ('terreno', 'terreno'),
+        ('sitio', 'terreno'),
+    ]
+
+    def _infer_tipo(self, headline: str, titulo: str = '', atributos: str = '') -> str:
+        """
+        Infiere el tipo real de propiedad a partir de su contenido (headline/título/atributos).
+
+        Portal Inmobiliario mezcla resultados destacados de otras categorías en las páginas
+        de listado, por lo que no podemos confiar en `self.tipo_propiedad` para etiquetar.
+
+        Args:
+            headline: Texto del headline (p.ej. "Departamentos en venta").
+            titulo: Título de la propiedad (fallback).
+            atributos: Texto de atributos (último fallback).
+
+        Returns:
+            Tipo canónico de Config.TIPOS_PROPIEDAD. Si no se detecta nada, devuelve
+            self.tipo_propiedad como fallback.
+        """
+        haystack = ' '.join(filter(None, [headline, titulo, atributos])).lower()
+        if not haystack:
+            return self.tipo_propiedad
+        for keyword, canonical in self._HEADLINE_TIPO_KEYWORDS:
+            if keyword in haystack:
+                return canonical
+        return self.tipo_propiedad
+
+    def _extract_property_data(self, listing) -> Optional[Dict[str, any]]:
+        """Extrae datos de una propiedad desde el listado."""
         try:
-            # Título - estructura: h3.poly-component__title-wrapper > a.poly-component__title
+            import re
+
+            # Título
             titulo = "N/A"
             titulo_elem = listing.select_one('a.poly-component__title')
             if titulo_elem:
                 titulo = titulo_elem.get_text(strip=True)
-            
-            # Headline (tipo de propiedad) - span.poly-component__headline
+
+            # Headline
             headline = "N/A"
             headline_elem = listing.select_one('span.poly-component__headline')
             if headline_elem:
                 headline = headline_elem.get_text(strip=True)
-            
-            # Precio - span.andes-money-amount__fraction dentro de .poly-price__current
+
+            # Precio actual
             precio = "N/A"
             precio_elem = listing.select_one('.poly-price__current span.andes-money-amount__fraction')
             if precio_elem:
                 precio = precio_elem.get_text(strip=True)
-            
-            # Moneda - span.andes-money-amount__currency-symbol
+
             moneda = ""
             moneda_elem = listing.select_one('.poly-price__current span.andes-money-amount__currency-symbol')
             if moneda_elem:
                 moneda = moneda_elem.get_text(strip=True)
-            
-            # Ubicación - span.poly-component__location
+
+            # Precio anterior (si hay descuento)
+            precio_anterior = None
+            prev_elem = listing.select_one('s.andes-money-amount--previous span.andes-money-amount__fraction, .poly-price__previous span.andes-money-amount__fraction')
+            if prev_elem:
+                precio_anterior = parse_money(prev_elem.get_text(strip=True))
+
+            # Ubicación
             ubicacion = "N/A"
             ubicacion_elem = listing.select_one('span.poly-component__location')
             if ubicacion_elem:
                 ubicacion = ubicacion_elem.get_text(strip=True)
-            
-            # Atributos (m², dormitorios, etc.) - ul.poly-attributes_list > li
+
+            # Atributos
             atributos = []
             atributos_elems = listing.select('ul.poly-attributes_list li.poly-attributes_list__item')
             for attr in atributos_elems:
                 atributos.append(attr.get_text(strip=True))
-            
-            # URL - a.poly-component__title
+
+            # URL
             url = "N/A"
             link_elem = listing.select_one('a.poly-component__title')
             if link_elem:
                 url = link_elem.get('href', 'N/A')
-            
-            # ID de la propiedad - extraer del URL (formato: MLC-XXXXXXX)
+
+            # Tags / highlights (p.ej. "OPORTUNIDAD", "NUEVO")
+            tags = []
+            for tag_elem in listing.select('.poly-component__highlight, .poly-pill, .ui-search-item__highlight-label'):
+                t = tag_elem.get_text(strip=True)
+                if t:
+                    tags.append(t)
+
+            # Thumbnail
+            thumbnail = None
+            img_elem = listing.select_one('img.poly-component__picture, img.ui-search-result-image__element')
+            if img_elem:
+                thumbnail = (
+                    img_elem.get('data-src')
+                    or img_elem.get('data-lazy')
+                    or img_elem.get('src')
+                )
+
+            # Número de fotos (badge de galería si está presente)
+            num_fotos = None
+            photos_elem = listing.select_one('.ui-search-result__image-counter, .poly-component__gallery-counter')
+            if photos_elem:
+                num_fotos = parse_int(photos_elem.get_text(strip=True))
+
+            # data-id canónico del <li>
+            data_id = None
+            try:
+                data_id = listing.get('data-id') or listing.get('data-item-id')
+            except Exception:
+                pass
+
+            # ID de la propiedad - preferir data-id, fallback a URL
             property_id = "N/A"
-            if url != "N/A" and 'MLC-' in url:
-                import re
-                match = re.search(r'MLC-(\d+)', url)
+            if data_id and data_id.upper().startswith('MLC'):
+                property_id = data_id.upper().replace('MLC', 'MLC-').replace('--', '-')
+            elif url != "N/A" and 'MLC-' in url:
+                match = re.search(r'MLC-?(\d+)', url)
                 if match:
                     property_id = f"MLC-{match.group(1)}"
-            
-            # Validar que al menos tengamos precio o título
+
             if titulo == "N/A" and precio == "N/A":
                 return None
-            
+
             return {
                 'id': property_id,
                 'titulo': titulo,
                 'headline': headline,
                 'precio': f"{moneda} {precio}" if moneda else precio,
+                'precio_anterior': precio_anterior,
                 'ubicacion': ubicacion,
                 'atributos': ', '.join(atributos) if atributos else "N/A",
                 'url': url,
                 'operacion': self.operacion,
-                'tipo': self.tipo_propiedad
+                # Inferir el tipo real desde el contenido; evita contaminar la categoría
+                # con propiedades destacadas de otras categorías que Portal Inmobiliario
+                # intercala en el listado.
+                'tipo': self._infer_tipo(
+                    headline if headline != "N/A" else '',
+                    titulo if titulo != "N/A" else '',
+                    ', '.join(atributos) if atributos else ''
+                ),
+                'tags': tags,
+                'thumbnail_url': thumbnail,
+                'num_fotos': num_fotos,
             }
-            
+
         except Exception as e:
             logger.debug(f"Error extrayendo datos: {e}")
             return None
@@ -391,261 +497,528 @@ class PortalInmobiliarioSeleniumScraper:
         
         return self.propiedades
     
+    def _scroll_to_bottom(self, steps: int = 6, pause: float = 0.6) -> None:
+        """Scroll incremental para disparar lazy-load de galería, mapa y specs."""
+        try:
+            last_height = self.driver.execute_script("return document.body.scrollHeight")
+            for i in range(steps):
+                self.driver.execute_script(
+                    f"window.scrollTo(0, document.body.scrollHeight * {(i + 1) / steps});"
+                )
+                time.sleep(pause)
+            # Final full scroll
+            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(pause)
+            self.driver.execute_script("window.scrollTo(0, 0);")
+            time.sleep(0.2)
+        except Exception as e:
+            logger.debug(f"scroll_to_bottom error: {e}")
+
+    def _extract_json_state(self) -> Optional[dict]:
+        """
+        Intenta leer el estado preinicializado que MercadoLibre inyecta en el
+        HTML renderizado (window.__PRELOADED_STATE__ / __INITIAL_STATE__).
+
+        Devuelve el dict o None si no está disponible.
+        """
+        scripts = [
+            "return window.__PRELOADED_STATE__ || null;",
+            "return window.__INITIAL_STATE__ || null;",
+            "return window.__NEXT_DATA__ && window.__NEXT_DATA__.props || null;",
+        ]
+        for js in scripts:
+            try:
+                result = self.driver.execute_script(js)
+                if result:
+                    return result
+            except Exception:
+                continue
+        return None
+
     def scrape_property_detail(self, property_id: str, property_url: str) -> Dict[str, any]:
         """
-        Scrapea la página de detalle de una propiedad.
-        
-        Args:
-            property_id: ID de la propiedad (ej: "MLC-3705621748")
-            property_url: URL completa de la propiedad
-            
-        Returns:
-            dict con datos detallados o dict vacío si falla
+        Scrapea la PDP de una propiedad capturando el máximo de campos:
+        precio, superficies, dormitorios, baños, orientación, vista, piso,
+        gastos comunes, amenities, servicios, publicador, imágenes, coordenadas,
+        tags, breadcrumbs, fecha publicación/actualización, estado, visitas, etc.
         """
-        detail_data = {
+        import re
+        from datetime import datetime, timedelta
+
+        detail_data: Dict[str, any] = {
             'descripcion': None,
-            'caracteristicas': {},
+            'descripcion_html': None,
+            'caracteristicas': {},          # typed fields mapped to Property columns
+            'features_raw': [],             # all specs as list[{key, value}]
+            'amenities': [],
+            'servicios': [],
             'publicador': {},
-            'imagenes': [],
+            'imagenes': [],                 # list[{url, alt, orden}]
             'coordenadas': {},
-            'fecha_publicacion': None
+            'fecha_publicacion': None,
+            'fecha_actualizacion': None,
+            'visitas': None,
+            'estado_publicacion': None,
+            'breadcrumbs': [],
+            'raw_state': None,
         }
-        
+
         try:
-            logger.info(f"Scrapeando detalle de propiedad {property_id}...")
-            
-            # Navegar a URL de detalle
+            logger.info(f"Scrapeando detalle de {property_id}...")
             self.driver.get(property_url)
-            time.sleep(3)  # Esperar carga inicial
-            
-            # Esperar a que cargue el contenido principal
+
             try:
                 self.wait.until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, 
+                    EC.presence_of_element_located((By.CSS_SELECTOR,
                         'div.ui-pdp-container__content, div.ui-pdp-header, h1.ui-pdp-title'))
                 )
-                logger.info(f"Página de detalle cargada para {property_id}")
-            except Exception as e:
-                logger.warning(f"Timeout esperando contenido de detalle para {property_id}: {e}")
-            
-            page_source = self.driver.page_source
-            soup = BeautifulSoup(page_source, 'lxml')
-            
-            # Extraer descripción completa
+            except Exception:
+                logger.warning(f"Timeout esperando PDP {property_id}")
+
+            # Trigger lazy-load (images, map, specs)
+            self._scroll_to_bottom()
+
+            # Estado JSON embebido (fuente rica)
             try:
-                desc_elem = soup.select_one('div.ui-pdp-description__content, div.ui-pdp-description, p[data-testid="description"]')
+                state = self._extract_json_state()
+                if state:
+                    detail_data['raw_state'] = state
+                    self._merge_state_into_detail(state, detail_data)
+                    logger.debug(f"raw_state capturado para {property_id}")
+            except Exception as e:
+                logger.debug(f"Error extrayendo raw_state: {e}")
+
+            soup = BeautifulSoup(self.driver.page_source, 'lxml')
+
+            # --- Descripción ---
+            if not detail_data.get('descripcion'):
+                desc_elem = soup.select_one(
+                    'p.ui-pdp-description__content, div.ui-pdp-description__content, '
+                    'div.ui-pdp-description, p[data-testid="description"]'
+                )
                 if desc_elem:
-                    detail_data['descripcion'] = desc_elem.get_text(strip=True)
-                    logger.debug(f"Descripción extraída: {len(detail_data['descripcion'])} chars")
-            except Exception as e:
-                logger.debug(f"Error extrayendo descripción: {e}")
-            
-            # Extraer características detalladas
-            try:
-                # Buscar tabla de características o lista de atributos
-                caracteristicas = {}
-                
-                # Selectores comunes para características
-                attr_selectors = [
-                    'div.ui-vip-specs__table table tr',
-                    'div.ui-pdp-specs__table table tr',
-                    'div.ui-pdp-specs__list dl',
-                    '.andes-table__body .andes-table__row',
-                    'div[data-testid="specs-list"] .andes-list__item'
+                    detail_data['descripcion'] = desc_elem.get_text('\n', strip=True)
+                    detail_data['descripcion_html'] = str(desc_elem)
+
+            # --- Specs exhaustivas (tabla + lista + highlighted) ---
+            raw_features, caracteristicas = self._extract_all_specs(soup)
+            detail_data['features_raw'].extend(raw_features)
+            detail_data['caracteristicas'].update(caracteristicas)
+
+            # --- Amenities / servicios ---
+            amenities, servicios = self._extract_amenities_services(soup, raw_features)
+            # dedup preserving insertion order
+            detail_data['amenities'] = list(dict.fromkeys(detail_data['amenities'] + amenities))
+            detail_data['servicios'] = list({s['nombre']: s for s in (detail_data['servicios'] + servicios)}.values())
+
+            # --- Publicador ampliado ---
+            publicador = self._extract_publisher(soup)
+            # do not override JSON-state fields that are truthy
+            for k, v in publicador.items():
+                if v and not detail_data['publicador'].get(k):
+                    detail_data['publicador'][k] = v
+
+            # --- Imágenes (sin límite, alta resolución) ---
+            if not detail_data['imagenes']:
+                detail_data['imagenes'] = self._extract_images(soup)
+
+            # --- Coordenadas (fallback si no vino en state) ---
+            if not detail_data['coordenadas']:
+                detail_data['coordenadas'] = self._extract_coordinates(soup)
+
+            # --- Breadcrumbs ---
+            if not detail_data['breadcrumbs']:
+                detail_data['breadcrumbs'] = [
+                    a.get_text(strip=True)
+                    for a in soup.select('nav.andes-breadcrumb a, .ui-pdp-breadcrumb a')
+                    if a.get_text(strip=True)
                 ]
-                
-                for selector in attr_selectors:
-                    rows = soup.select(selector)
-                    if rows:
-                        for row in rows:
-                            try:
-                                # Intentar diferentes estructuras
-                                key_elem = row.select_one('th, dt, .andes-table__header, .andes-list__item-primary')
-                                value_elem = row.select_one('td, dd, .andes-table__column, .andes-list__item-secondary')
-                                
-                                if key_elem and value_elem:
-                                    key = key_elem.get_text(strip=True).lower()
-                                    value = value_elem.get_text(strip=True)
-                                    
-                                    # Mapear campos conocidos
-                                    if any(x in key for x in ['orientación', 'orientacion']):
-                                        caracteristicas['orientacion'] = value
-                                    elif any(x in key for x in ['año', 'construcción', 'construccion']):
-                                        # Extraer número del año
-                                        import re
-                                        year_match = re.search(r'\d{4}', value)
-                                        if year_match:
-                                            caracteristicas['año_construccion'] = int(year_match.group())
-                                    elif any(x in key for x in ['gastos comunes', 'gasto común']):
-                                        # Extraer número de gastos
-                                        import re
-                                        gasto_match = re.search(r'[\d.,]+', value.replace('.', '').replace(',', ''))
-                                        if gasto_match:
-                                            try:
-                                                caracteristicas['gastos_comunes'] = int(gasto_match.group().replace('.', ''))
-                                            except:
-                                                pass
-                                    elif any(x in key for x in ['estacionamiento', 'estacionamientos']):
-                                        import re
-                                        est_match = re.search(r'\d+', value)
-                                        if est_match:
-                                            caracteristicas['estacionamientos'] = int(est_match.group())
-                                    elif any(x in key for x in ['bodega', 'bodegas']):
-                                        import re
-                                        bod_match = re.search(r'\d+', value)
-                                        if bod_match:
-                                            caracteristicas['bodegas'] = int(bod_match.group())
-                            except:
-                                continue
-                        break  # Si encontramos datos, salir del loop de selectores
-                
-                detail_data['caracteristicas'] = caracteristicas
-                logger.debug(f"Características extraídas: {len(caracteristicas)} items")
-            except Exception as e:
-                logger.debug(f"Error extrayendo características: {e}")
-            
-            # Extraer información del publicador
-            try:
-                publicador = {}
-                
-                # Buscar nombre del publicador
-                pub_name_elem = soup.select_one('div.ui-pdp-seller__header__title, .ui-seller-data__name, [data-testid="seller-name"]')
-                if pub_name_elem:
-                    publicador['nombre'] = pub_name_elem.get_text(strip=True)
-                
-                # Determinar tipo (inmobiliaria vs particular)
-                pub_type_elem = soup.select_one('div.ui-pdp-seller__header__label, .ui-seller-data__label, [data-testid="seller-type"]')
-                if pub_type_elem:
-                    tipo_text = pub_type_elem.get_text(strip=True).lower()
-                    if any(x in tipo_text for x in ['inmobiliaria', 'agente', 'corredor']):
-                        publicador['tipo'] = 'inmobiliaria'
-                    else:
-                        publicador['tipo'] = 'particular'
-                else:
-                    # Fallback: si no hay label específico, inferir por nombre
-                    if publicador.get('nombre'):
-                        nombre_lower = publicador['nombre'].lower()
-                        if any(x in nombre_lower for x in ['inmobiliaria', 'propiedades', 'bienes raíces', 'asesor']):
-                            publicador['tipo'] = 'inmobiliaria'
-                        else:
-                            publicador['tipo'] = 'particular'
-                
-                detail_data['publicador'] = publicador
-                logger.debug(f"Publicador extraído: {publicador.get('nombre', 'N/A')}")
-            except Exception as e:
-                logger.debug(f"Error extrayendo publicador: {e}")
-            
-            # Extraer URLs de imágenes
-            try:
-                imagenes = []
-                
-                # Buscar galería de imágenes
-                img_selectors = [
-                    'div.ui-pdp-gallery__column img',
-                    'div.ui-pdp-gallery img',
-                    'figure.ui-pdp-gallery__figure img',
-                    'img[data-testid="gallery-image"]'
-                ]
-                
-                for selector in img_selectors:
-                    img_elements = soup.select(selector)
-                    if img_elements:
-                        for img in img_elements:
-                            # Intentar obtener URL de alta resolución
-                            src = img.get('data-src') or img.get('data-full-src') or img.get('src')
-                            if src and src not in imagenes:
-                                # Limpiar URL para obtener versión grande
-                                src = src.replace('/D_NQ_NP_', '/D_NQ_NP_2X_')
-                                imagenes.append(src)
-                        
-                        if imagenes:
+
+            # --- Fecha publicación / visitas / estado ---
+            for elem in soup.select('div.ui-pdp-header__bottom-line span, .ui-pdp-subtitle, '
+                                    '.ui-pdp-header__info, [data-testid="publication-date"]'):
+                txt = elem.get_text(' ', strip=True).lower()
+                if not txt:
+                    continue
+                # Fecha publicación
+                if detail_data['fecha_publicacion'] is None and ('publicado' in txt or 'hace' in txt):
+                    detail_data['fecha_publicacion'] = self._parse_relative_date(txt)
+                # Visitas
+                if detail_data['visitas'] is None and 'visita' in txt:
+                    n = parse_int(txt)
+                    if n:
+                        detail_data['visitas'] = n
+                # Estado
+                if detail_data['estado_publicacion'] is None:
+                    for st in ('activa', 'pausada', 'finalizada', 'vendido', 'arrendado'):
+                        if st in txt:
+                            detail_data['estado_publicacion'] = st
                             break
-                
-                detail_data['imagenes'] = imagenes[:10]  # Limitar a 10 imágenes
-                logger.debug(f"Imágenes extraídas: {len(imagenes)}")
-            except Exception as e:
-                logger.debug(f"Error extrayendo imágenes: {e}")
-            
-            # Extraer coordenadas GPS
-            try:
-                coordenadas = {}
-                
-                # Buscar en scripts (datos de mapa)
-                scripts = soup.find_all('script')
-                for script in scripts:
-                    script_text = script.string if script else ''
-                    if script_text and ('latitude' in script_text or 'longitude' in script_text):
-                        import re
-                        # Buscar coordenadas en formato JSON o variables
-                        lat_match = re.search(r'["\']latitude["\']\s*:\s*(-?\d+\.?\d*)', script_text)
-                        lng_match = re.search(r'["\']longitude["\']\s*:\s*(-?\d+\.?\d*)', script_text)
-                        
-                        if lat_match and lng_match:
-                            coordenadas['lat'] = float(lat_match.group(1))
-                            coordenadas['lng'] = float(lng_match.group(1))
-                            break
-                
-                # Alternativa: buscar en meta tags o elementos de mapa
-                if not coordenadas:
-                    map_elem = soup.select_one('div.ui-pdp-map, [data-testid="map-container"]')
-                    if map_elem:
-                        data_coords = map_elem.get('data-coordinates') or map_elem.get('data-latlng')
-                        if data_coords:
-                            import re
-                            coords = re.findall(r'-?\d+\.?\d*', data_coords)
-                            if len(coords) >= 2:
-                                coordenadas['lat'] = float(coords[0])
-                                coordenadas['lng'] = float(coords[1])
-                
-                if coordenadas:
-                    detail_data['coordenadas'] = coordenadas
-                    logger.debug(f"Coordenadas extraídas: {coordenadas}")
-            except Exception as e:
-                logger.debug(f"Error extrayendo coordenadas: {e}")
-            
-            # Extraer fecha de publicación
-            try:
-                fecha_elem = soup.select_one('div.ui-pdp-header__bottom-line span, .ui-pdp-date, [data-testid="publication-date"]')
-                if fecha_elem:
-                    fecha_text = fecha_elem.get_text(strip=True).lower()
-                    # Parsear formatos comunes: "Publicado hace X días", "15 de marzo de 2024"
-                    import re
-                    from datetime import datetime, timedelta
-                    
-                    if 'hace' in fecha_text:
-                        # "Publicado hace 5 días"
-                        num_match = re.search(r'(\d+)', fecha_text)
-                        if num_match:
-                            dias = int(num_match.group(1))
-                            fecha = datetime.now() - timedelta(days=dias)
-                            detail_data['fecha_publicacion'] = fecha.strftime('%Y-%m-%d')
-                    else:
-                        # Intentar parsear fecha directa
-                        meses_es = {
-                            'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4,
-                            'mayo': 5, 'junio': 6, 'julio': 7, 'agosto': 8,
-                            'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12
-                        }
-                        
-                        # Buscar patrón: "15 de marzo de 2024"
-                        fecha_match = re.search(r'(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})', fecha_text)
-                        if fecha_match:
-                            dia = int(fecha_match.group(1))
-                            mes = meses_es.get(fecha_match.group(2).lower(), 0)
-                            anio = int(fecha_match.group(3))
-                            if mes > 0:
-                                fecha = datetime(anio, mes, dia)
-                                detail_data['fecha_publicacion'] = fecha.strftime('%Y-%m-%d')
-            except Exception as e:
-                logger.debug(f"Error extrayendo fecha: {e}")
-            
-            logger.info(f"Detalle scrapeado exitosamente para {property_id}")
-            
+
+            logger.info(
+                f"Detalle OK {property_id}: "
+                f"{len(detail_data['features_raw'])} specs, "
+                f"{len(detail_data['amenities'])} amenities, "
+                f"{len(detail_data['imagenes'])} imgs"
+            )
+
         except Exception as e:
             logger.error(f"Error scrapeando detalle de {property_id}: {e}")
-            # Retornar datos parciales si los hay, o vacío
-        
+
         return detail_data
+
+    # ------------------------------------------------------------------ #
+    # Helpers para detalle                                                #
+    # ------------------------------------------------------------------ #
+
+    def _extract_all_specs(self, soup: BeautifulSoup):
+        """
+        Recorre TODOS los bloques de specs del PDP (tabla, listas, highlighted)
+        y devuelve (raw_features, caracteristicas_tipadas).
+
+        `raw_features` es lista de dicts {key, value} con todas las specs tal cual.
+        `caracteristicas_tipadas` es dict campo_Property -> valor_parseado.
+        """
+        raw_features = []
+        caracteristicas: Dict[str, any] = {}
+        seen_keys = set()
+
+        # 1. Tablas de specs
+        row_selectors = [
+            'div.ui-vpp-striped-specs__table tr',
+            'div.ui-vpp-highlighted-specs__striped-specs tr',
+            'div.ui-pdp-specs__table table tr',
+            'table.andes-table tbody tr',
+            '.andes-table__body .andes-table__row',
+        ]
+        for sel in row_selectors:
+            for row in soup.select(sel):
+                key_elem = row.select_one('th, .andes-table__header, .ui-pdp-specs__table__column-title')
+                val_elem = row.select_one('td, .andes-table__column, .ui-pdp-specs__table__column-value')
+                if not key_elem or not val_elem:
+                    continue
+                key = key_elem.get_text(strip=True)
+                value = val_elem.get_text(' ', strip=True)
+                if not key or not value:
+                    continue
+                nk = normalize_key(key)
+                if nk in seen_keys:
+                    continue
+                seen_keys.add(nk)
+                raw_features.append({'key': key, 'value': value})
+                mapped = map_feature(key, value)
+                if mapped:
+                    caracteristicas[mapped[0]] = mapped[1]
+
+        # 2. Listas (key-value)
+        for dl in soup.select('div.ui-pdp-specs__list dl, .ui-vpp-highlighted-specs__key-value'):
+            key_elem = dl.select_one('dt, .ui-vpp-highlighted-specs__key-value__labels, .andes-list__item-primary')
+            val_elem = dl.select_one('dd, .ui-vpp-highlighted-specs__key-value__value, .andes-list__item-secondary')
+            if not key_elem or not val_elem:
+                continue
+            key = key_elem.get_text(strip=True)
+            value = val_elem.get_text(' ', strip=True)
+            if not key or not value:
+                continue
+            nk = normalize_key(key)
+            if nk in seen_keys:
+                continue
+            seen_keys.add(nk)
+            raw_features.append({'key': key, 'value': value})
+            mapped = map_feature(key, value)
+            if mapped:
+                caracteristicas[mapped[0]] = mapped[1]
+
+        # 3. Highlighted specs (iconos con m², dormitorios...)
+        for item in soup.select(
+            'ul.ui-pdp-highlighted-specs__features-list li, '
+            'div.ui-vpp-highlighted-specs__attribute-columns div, '
+            'div.ui-pdp-highlighted-specs__main-feature'
+        ):
+            txt = item.get_text(' ', strip=True)
+            if not txt:
+                continue
+            # Heurística: "3 dormitorios", "80 m² útiles"
+            m = re.match(r'^\s*(\d+[\.,]?\d*)\s+(.+)$', txt)
+            if not m:
+                continue
+            value, key = m.group(1), m.group(2)
+            nk = normalize_key(key)
+            if nk in seen_keys:
+                continue
+            seen_keys.add(nk)
+            raw_features.append({'key': key, 'value': value})
+            mapped = map_feature(key, value)
+            if mapped:
+                caracteristicas[mapped[0]] = mapped[1]
+
+        return raw_features, caracteristicas
+
+    def _extract_amenities_services(self, soup: BeautifulSoup, raw_features):
+        """Detecta amenities del edificio y servicios a partir de specs e iconos."""
+        amenities = []
+        servicios = []
+
+        # Lista explícita de amenities/servicios en la PDP
+        for li in soup.select(
+            'ul.ui-pdp-specs__list li, '
+            'ul.ui-vpp-amenities__list li, '
+            'section[data-testid="amenities"] li'
+        ):
+            name = li.get_text(' ', strip=True)
+            if not name:
+                continue
+            nk = normalize_key(name)
+            if nk in SERVICE_KEYWORDS or any(w in nk for w in SERVICE_KEYWORDS):
+                servicios.append({'nombre': name, 'incluido': True})
+            else:
+                amenities.append(name)
+
+        # También escanear specs con values "Sí/Si" que suelen ser amenities booleanos
+        for feat in raw_features:
+            nk = normalize_key(feat['key'])
+            val_norm = normalize_key(str(feat['value']))
+            if val_norm in {'si', 'yes', 'true', 'incluido'}:
+                if any(w in nk for w in SERVICE_KEYWORDS):
+                    servicios.append({'nombre': feat['key'], 'incluido': True})
+                elif any(w in nk for w in AMENITY_KEYWORDS):
+                    amenities.append(feat['key'])
+
+        return amenities, servicios
+
+    def _extract_publisher(self, soup: BeautifulSoup) -> dict:
+        publicador = {}
+
+        name_elem = soup.select_one(
+            'div.ui-pdp-seller__header__title, .ui-seller-data__name, '
+            'h2.ui-seller-info__header__title, [data-testid="seller-name"]'
+        )
+        if name_elem:
+            publicador['nombre'] = name_elem.get_text(strip=True)
+
+        logo_elem = soup.select_one('img.ui-pdp-seller__header__logo, img.ui-seller-data__logo')
+        if logo_elem:
+            publicador['logo_url'] = logo_elem.get('src') or logo_elem.get('data-src')
+
+        perfil_elem = soup.select_one(
+            'a.ui-pdp-seller__link-trigger, a.ui-seller-info__link, '
+            'a[data-testid="seller-link"]'
+        )
+        if perfil_elem and perfil_elem.get('href'):
+            publicador['perfil_url'] = perfil_elem['href']
+
+        rep_elem = soup.select_one('.ui-seller-info__status-info__title, .ui-pdp-seller__status__title')
+        if rep_elem:
+            publicador['reputacion'] = rep_elem.get_text(strip=True)
+
+        # Tipo
+        type_elem = soup.select_one(
+            'div.ui-pdp-seller__header__label, .ui-seller-data__label, '
+            '[data-testid="seller-type"]'
+        )
+        tipo_text = type_elem.get_text(strip=True).lower() if type_elem else ''
+        if not tipo_text and publicador.get('nombre'):
+            tipo_text = publicador['nombre'].lower()
+        if any(x in tipo_text for x in ['constructora', 'inmobiliaria', 'propiedades',
+                                        'bienes raices', 'bienes raíces', 'corredor',
+                                        'agente']):
+            if 'constructora' in tipo_text:
+                publicador['tipo'] = 'constructora'
+            else:
+                publicador['tipo'] = 'inmobiliaria'
+        elif publicador.get('nombre'):
+            publicador['tipo'] = 'particular'
+
+        # Teléfono (si aparece visible)
+        tel_elem = soup.select_one('a[href^="tel:"]')
+        if tel_elem:
+            publicador['telefono'] = tel_elem.get('href', '').replace('tel:', '').strip()
+
+        return publicador
+
+    def _extract_images(self, soup: BeautifulSoup) -> list:
+        """Extrae todas las imágenes de la galería con orden y alt."""
+        imagenes = []
+        seen = set()
+        selectors = [
+            'figure.ui-pdp-gallery__figure img',
+            'div.ui-pdp-gallery__column img',
+            'div.ui-pdp-gallery img',
+            'img[data-testid="gallery-image"]',
+        ]
+        for selector in selectors:
+            elems = soup.select(selector)
+            if not elems:
+                continue
+            for idx, img in enumerate(elems):
+                src = (img.get('data-zoom')
+                       or img.get('data-full-src')
+                       or img.get('data-src')
+                       or img.get('src'))
+                if not src or src in seen:
+                    continue
+                # Forzar alta resolución
+                src_hd = src.replace('/D_NQ_NP_', '/D_NQ_NP_2X_')
+                seen.add(src)
+                imagenes.append({
+                    'url': src_hd,
+                    'alt': img.get('alt'),
+                    'orden': idx,
+                    'resolucion': '2X' if 'D_NQ_NP_2X_' in src_hd else None,
+                })
+            if imagenes:
+                break
+        return imagenes
+
+    def _extract_coordinates(self, soup: BeautifulSoup) -> dict:
+        import re
+        coords: Dict[str, float] = {}
+
+        for script in soup.find_all('script'):
+            text = script.string or ''
+            if not text or ('latitude' not in text and 'lat' not in text):
+                continue
+            lat_m = re.search(r'["\']lat(?:itude)?["\']\s*:\s*(-?\d+\.?\d*)', text)
+            lng_m = re.search(r'["\']l(?:ng|ong(?:itude)?)["\']\s*:\s*(-?\d+\.?\d*)', text)
+            if lat_m and lng_m:
+                try:
+                    coords['lat'] = float(lat_m.group(1))
+                    coords['lng'] = float(lng_m.group(1))
+                    break
+                except ValueError:
+                    pass
+
+        if not coords:
+            map_elem = soup.select_one('div.ui-pdp-map, [data-testid="map-container"]')
+            if map_elem:
+                raw = map_elem.get('data-coordinates') or map_elem.get('data-latlng') or ''
+                nums = re.findall(r'-?\d+\.\d+', raw)
+                if len(nums) >= 2:
+                    coords['lat'] = float(nums[0])
+                    coords['lng'] = float(nums[1])
+
+        return coords
+
+    def _parse_relative_date(self, text: str):
+        import re
+        from datetime import datetime, timedelta
+        text = text.lower()
+        # Días
+        m = re.search(r'hace\s+(\d+)\s+d[ií]a', text)
+        if m:
+            return (datetime.now() - timedelta(days=int(m.group(1)))).strftime('%Y-%m-%d')
+        m = re.search(r'hace\s+(\d+)\s+(?:mes|meses)', text)
+        if m:
+            return (datetime.now() - timedelta(days=int(m.group(1)) * 30)).strftime('%Y-%m-%d')
+        m = re.search(r'hace\s+(\d+)\s+(?:hora|horas)', text)
+        if m:
+            return datetime.now().strftime('%Y-%m-%d')
+        # "15 de marzo de 2024"
+        meses = {'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5, 'junio': 6,
+                 'julio': 7, 'agosto': 8, 'septiembre': 9, 'octubre': 10, 'noviembre': 11,
+                 'diciembre': 12}
+        m = re.search(r'(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})', text)
+        if m:
+            mes = meses.get(m.group(2), 0)
+            if mes:
+                try:
+                    return datetime(int(m.group(3)), mes, int(m.group(1))).strftime('%Y-%m-%d')
+                except ValueError:
+                    return None
+        return None
+
+    def _merge_state_into_detail(self, state: dict, detail_data: dict) -> None:
+        """Fusiona campos útiles del `__PRELOADED_STATE__` en detail_data.
+
+        MercadoLibre suele anidar los datos en `state['initialState']['components']`
+        o `state['pageState']`. Buscamos algunas claves conocidas de forma
+        defensiva para no depender de una estructura exacta.
+        """
+        def walk(obj):
+            if isinstance(obj, dict):
+                yield obj
+                for v in obj.values():
+                    yield from walk(v)
+            elif isinstance(obj, list):
+                for v in obj:
+                    yield from walk(v)
+
+        try:
+            for node in walk(state):
+                # Descripción (plain_text o content)
+                if 'description' in node and isinstance(node['description'], dict):
+                    txt = node['description'].get('plain_text') or node['description'].get('content')
+                    if txt and not detail_data.get('descripcion'):
+                        detail_data['descripcion'] = txt
+
+                # Pictures
+                if 'pictures' in node and isinstance(node['pictures'], list) and not detail_data['imagenes']:
+                    imgs = []
+                    for i, p in enumerate(node['pictures']):
+                        if isinstance(p, dict):
+                            url = p.get('url') or p.get('secure_url') or p.get('src')
+                            if url:
+                                imgs.append({
+                                    'url': url.replace('/D_NQ_NP_', '/D_NQ_NP_2X_'),
+                                    'alt': p.get('alt'),
+                                    'orden': i,
+                                    'resolucion': '2X',
+                                })
+                    if imgs:
+                        detail_data['imagenes'] = imgs
+
+                # Location
+                if 'location' in node and isinstance(node['location'], dict):
+                    loc = node['location']
+                    lat = loc.get('latitude') or loc.get('lat')
+                    lng = loc.get('longitude') or loc.get('lng')
+                    if lat and lng and not detail_data['coordenadas']:
+                        try:
+                            detail_data['coordenadas'] = {'lat': float(lat), 'lng': float(lng)}
+                        except (TypeError, ValueError):
+                            pass
+                    for key in ('neighborhood', 'barrio', 'city', 'state', 'address_line'):
+                        val = loc.get(key)
+                        if isinstance(val, dict):
+                            val = val.get('name')
+                        if val and key == 'neighborhood' and not detail_data['caracteristicas'].get('barrio'):
+                            detail_data['caracteristicas']['barrio'] = val
+
+                # Attributes (list of {id, name, value_name})
+                if 'attributes' in node and isinstance(node['attributes'], list):
+                    for attr in node['attributes']:
+                        if not isinstance(attr, dict):
+                            continue
+                        name = attr.get('name') or attr.get('id')
+                        value = attr.get('value_name') or attr.get('value') or attr.get('values')
+                        if isinstance(value, list) and value:
+                            value = ', '.join(
+                                v.get('name') if isinstance(v, dict) else str(v)
+                                for v in value if v
+                            )
+                        if not name or value in (None, ''):
+                            continue
+                        detail_data['features_raw'].append({'key': name, 'value': value})
+                        mapped = map_feature(name, value)
+                        if mapped:
+                            detail_data['caracteristicas'][mapped[0]] = mapped[1]
+
+                # Seller
+                if 'seller' in node and isinstance(node['seller'], dict):
+                    s = node['seller']
+                    pub = detail_data['publicador']
+                    pub.setdefault('nombre', s.get('nickname') or s.get('name'))
+                    if s.get('permalink') and not pub.get('perfil_url'):
+                        pub['perfil_url'] = s['permalink']
+                    if s.get('logo') and not pub.get('logo_url'):
+                        pub['logo_url'] = s['logo']
+                    reputation = s.get('seller_reputation') or {}
+                    if isinstance(reputation, dict):
+                        level = reputation.get('level_id') or reputation.get('power_seller_status')
+                        if level and not pub.get('reputacion'):
+                            pub['reputacion'] = str(level)
+        except Exception as e:
+            logger.debug(f"merge_state error: {e}")
     
     def close(self):
         """Cierra el navegador"""

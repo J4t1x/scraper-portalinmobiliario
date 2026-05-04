@@ -89,11 +89,19 @@ def create_scraping_job(
             logger.error(f"Job failed: {job_name} - {e}")
             raise
     
+    # Separate trigger args from scraping params
+    trigger_args = {}
+    scraping_params = ['max_pages', 'scrape_details', 'max_detail_properties', 'formato']
+    
+    for key, value in schedule_args.items():
+        if key not in scraping_params:
+            trigger_args[key] = value
+    
     scheduler.add_job(
         job_wrapper,
         job_id=job_id,
         trigger=schedule_type,
-        **schedule_args
+        **trigger_args
     )
     
     logger.info(f"Created job: {job_id} with schedule {schedule_type}")

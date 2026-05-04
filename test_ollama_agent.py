@@ -9,7 +9,7 @@ import os
 # Agregar el directorio actual al path para importar módulos
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from api.openai_agent import AnalyticsAgent
+from ai.agent import AnalyticsAgent
 from logger_config import get_logger
 
 logger = get_logger(__name__)

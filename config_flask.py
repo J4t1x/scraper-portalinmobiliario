@@ -19,5 +19,9 @@ class FlaskConfig:
     SOCKETIO_ASYNC_MODE = "threading"
     SOCKETIO_CORS_ALLOWED_ORIGINS = "*"
     
+    # Ollama configuration (unified model)
     OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
-    OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:3b")
+    OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:1.5b")
+    
+    # Redis configuration
+    REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")

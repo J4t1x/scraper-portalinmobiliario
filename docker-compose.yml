@@ -1,39 +1,28 @@
-version: '3.8'
+# ============================================================================
+# Docker Compose v2 - Portal Inmobiliario Scraper
+# Versión: 2.2 - Todos los servicios activos automáticamente
+# 
+# Puertos personalizados (base 4420):
+#   - PostgreSQL: 4420
+#   - Dashboard:  4421
+#   - Redis:      4422
+#   - Ollama:     4423
+#   - pgAdmin:    4425
+#
+# Uso:
+#   - Build:     docker-compose build
+#   - Start:     docker-compose up -d
+#   - Stop:      docker-compose down
+#   - Logs:      docker-compose logs -f
+#   - Scraping:  docker-compose run --rm scraper python main.py --operacion venta --tipo departamento
+#   - Admin:     docker-compose --profile admin up (pgAdmin)
+# ============================================================================
 
 services:
-  # Servicio principal: scraper
-  scraper:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: portalinmobiliario-scraper
-    environment:
-      - DATABASE_URL=postgresql://scraper:scraper123@postgres:5432/portalinmobiliario
-      - DELAY_BETWEEN_REQUESTS=${DELAY_BETWEEN_REQUESTS:-2}
-      - MAX_RETRIES=${MAX_RETRIES:-3}
-      - TIMEOUT=${TIMEOUT:-30}
-      - USER_AGENT=${USER_AGENT:-Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36}
-    volumes:
-      # Volumen para output (opcional, para desarrollo)
-      - ./output:/app/output
-      # Volumen para código (solo para desarrollo, comentar en producción)
-      - ./main.py:/app/main.py
-      - ./scraper_selenium.py:/app/scraper_selenium.py
-      - ./exporter.py:/app/exporter.py
-      - ./config.py:/app/config.py
-      - ./utils.py:/app/utils.py
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - scraper-network
-    # Comando por defecto (puede ser sobrescrito)
-    command: ["python", "main.py", "--help"]
-    # Para modo interactivo
-    stdin_open: true
-    tty: true
-
-  # Base de datos PostgreSQL (para testing local)
+  # ==========================================================================
+  # POSTGRESQL (Base de datos)
+  # RAM: ~100 MB
+  # ==========================================================================
   postgres:
     image: postgres:15-alpine
     container_name: portalinmobiliario-db
@@ -43,33 +32,205 @@ services:
       - POSTGRES_DB=portalinmobiliario
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      # Script de inicialización (crear si es necesario)
-      # - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
-      - "5432:5432"
+      - "4420:5432"
     networks:
       - scraper-network
+    mem_limit: 256m
+    mem_reservation: 128m
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U scraper"]
+      test: ["CMD-SHELL", "pg_isready -U scraper -d portalinmobiliario"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
-  # Adminer (opcional, para gestión de BD)
-  adminer:
-    image: adminer:latest
-    container_name: portalinmobiliario-adminer
+  # ==========================================================================
+  # REDIS (Cache layer - siempre activo)
+  # RAM: ~50 MB
+  # ==========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: portalinmobiliario-redis
+    command: redis-server --maxmemory 50mb --maxmemory-policy allkeys-lru
     ports:
-      - "8080:8080"
+      - "4422:6379"
     networks:
       - scraper-network
+    mem_limit: 100m
+    mem_reservation: 50m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ==========================================================================
+  # OLLAMA (Modelo IA para analytics - siempre activo)
+  # RAM adicional: ~1.5 GB
+  # ==========================================================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: portalinmobiliario-ollama
+    ports:
+      - "4423:11434"
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    volumes:
+      - ollama-models:/root/.ollama
+    networks:
+      - scraper-network
+    mem_limit: 2g
+    mem_reservation: 1g
+    cpus: 2
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ==========================================================================
+  # OLLAMA SETUP (descarga modelo automáticamente, luego sale)
+  # Solo se ejecuta una vez al inicio
+  # ==========================================================================
+  ollama-setup:
+    image: ollama/ollama:latest
+    container_name: portalinmobiliario-ollama-setup
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - scraper-network
+    entrypoint: >
+      sh -c "
+        echo '🤖 Verificando modelo qwen2.5-coder:1.5b...'
+        OLLAMA_HOST=http://ollama:11434 ollama list | grep -q 'qwen2.5-coder:1.5b' && {
+          echo '✅ Modelo ya instalado'
+          exit 0
+        }
+        echo '📥 Descargando modelo qwen2.5-coder:1.5b...'
+        OLLAMA_HOST=http://ollama:11434 ollama pull qwen2.5-coder:1.5b
+        echo '✅ Modelo descargado exitosamente'
+      "
+    restart: "no"
+
+  # ==========================================================================
+  # SCRAPER SERVICE (bajo demanda)
+  # Scraper con Chromium optimizado
+  # RAM: ~500 MB (scraping) / ~200 MB (idle)
+  # ==========================================================================
+  scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: portalinmobiliario-scraper
+    environment:
+      - DATABASE_URL=postgresql://scraper:scraper123@postgres:5432/portalinmobiliario
+      - REDIS_URL=redis://redis:6379
+      - OLLAMA_URL=http://ollama:11434
+      - DELAY_BETWEEN_REQUESTS=${DELAY_BETWEEN_REQUESTS:-2}
+      - MAX_RETRIES=${MAX_RETRIES:-3}
+      - TIMEOUT=${TIMEOUT:-30}
+      - USER_AGENT=${USER_AGENT:-Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./output:/app/output
+      - ./logs:/app/logs
+      - ./scripts:/app/scripts
+      - ./ai:/app/ai
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - scraper-network
+    mem_limit: 1g
+    mem_reservation: 512m
+    cpus: 1.5
+    stdin_open: true
+    tty: true
+    command: ["python", "main.py", "--help"]
+
+  # ==========================================================================
+  # DASHBOARD SERVICE (Flask + Analytics)
+  # RAM adicional: ~300 MB
+  # ==========================================================================
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: portalinmobiliario-dashboard
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    ports:
+      - "4421:5000"
+    environment:
+      - DATABASE_URL=postgresql://scraper:scraper123@postgres:5432/portalinmobiliario
+      - REDIS_URL=redis://redis:6379
+      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_MODEL=qwen2.5-coder:0.5b
+      - FLASK_ENV=production
+      - FLASK_PORT=5000
+      - PYTHONUNBUFFERED=1
+      - API_KEY=${API_KEY:-default-secret-key}
+    volumes:
+      - ./output:/app/output
+      - ./logs:/app/logs
+      - ./scripts:/app/scripts
+      - ./ai:/app/ai
+    networks:
+      - scraper-network
+    mem_limit: 512m
+    mem_reservation: 256m
+    cpus: 1
+    restart: unless-stopped
+    command: ["gunicorn", "--bind", "0.0.0.0:5000", "--worker-class", "eventlet", "--workers", "1", "--timeout", "120", "app:app"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/v2/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ==========================================================================
+  # PGADMIN (Opcional - activar con --profile admin)
+  # Gestión avanzada de PostgreSQL
+  # ==========================================================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: portalinmobiliario-pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@admin.com
+      - PGADMIN_DEFAULT_PASSWORD=admin123
+      - PGADMIN_CONFIG_SERVER_MODE=False
+      - PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED=False
+    ports:
+      - "4425:80"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    networks:
+      - scraper-network
+    profiles:
+      - admin
     depends_on:
       - postgres
-
-networks:
-  scraper-network:
-    driver: bridge
 
 volumes:
   postgres-data:
     driver: local
+  ollama-models:
+    driver: local
+  pgadmin-data:
+    driver: local
+
+networks:
+  scraper-network:
+    driver: bridge

@@ -4,7 +4,8 @@ Property model for scraped real estate data.
 
 from datetime import datetime
 from typing import List, Optional
-from sqlalchemy import Column, Integer, String, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, Numeric, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -39,41 +40,85 @@ class Property(Base):
     
     __tablename__ = 'properties'
     
-    # Primary key and identifiers
+    # Primary key and identifiers (mapped to actual DB columns)
     id = Column(Integer, primary_key=True, autoincrement=True)
-    url = Column(String(500), unique=True, nullable=False, index=True)
-    portal_id = Column(String(100), index=True, nullable=True)
+    # Python attr `portal_id` -> DB column `property_id` (portal listing identifier, e.g. "MLC-3705621748")
+    portal_id = Column('property_id', String(255), nullable=False)
+    url = Column(Text, nullable=True)
     
-    # Basic data
-    titulo = Column(String(500), nullable=True)
-    precio = Column(Integer, nullable=True)
-    precio_moneda = Column(String(10), nullable=True)
-    precio_original = Column(String(100), nullable=True)
-    operacion = Column(String(50), nullable=True, index=True)
-    tipo = Column(String(50), nullable=True, index=True)
+    # Basic data (mapped to actual DB columns)
+    titulo = Column('title', Text, nullable=True)  # DB: title
+    headline = Column(Text, nullable=True)
+    precio = Column(Numeric, nullable=True)
+    precio_moneda = Column(String(10), nullable=True)  # CLP, UF, USD
+    precio_original = Column(Text, nullable=True)  # Raw price string from scraper
     
-    # Location
-    comuna = Column(String(100), nullable=True, index=True)
-    region = Column(String(100), nullable=True)
-    direccion = Column(String(500), nullable=True)
+    # Operation and type (mapped to actual DB columns)
+    operacion = Column(String, nullable=True)
+    tipo = Column('tipo_propiedad', String, nullable=True)  # DB: tipo_propiedad
     
-    # Additional data from listing
-    headline = Column(String(500), nullable=True)
-    atributos = Column(String(1000), nullable=True)
+    # Location (mapped to actual DB columns)
+    direccion = Column('ubicacion', Text, nullable=True)  # DB: ubicacion
+    comuna = Column(String, nullable=True)
+    region = Column(String, nullable=True)
     
-    # Additional data from detail page
-    descripcion = Column(String(5000), nullable=True)
+    # Detail / descriptive fields
+    atributos = Column(Text, nullable=True)  # Raw attributes string from scraper
+    descripcion = Column(Text, nullable=True)  # Full description (from detail page)
+    publicado_en = Column(DateTime, nullable=True)  # Publication date
     
-    # Analytics fields
-    superficie_util = Column(Integer, nullable=True)
+    # Analytics fields (mapped to actual DB columns)
+    superficie_total = Column(Numeric, nullable=True)
+    superficie_util = Column(Numeric, nullable=True)
+    superficie_terraza = Column(Numeric, nullable=True)
+    superficie_terreno = Column(Numeric, nullable=True)
     dormitorios = Column(Integer, nullable=True)
     banos = Column(Integer, nullable=True)
-    precio_m2 = Column(Integer, nullable=True)
-    
-    # Metadata
-    publicado_en = Column(DateTime, nullable=True)
-    scrapeado_en = Column(DateTime, default=datetime.utcnow, nullable=False)
-    actualizado_en = Column(DateTime, onupdate=datetime.utcnow, nullable=True)
+    medios_banos = Column(Integer, nullable=True)
+    ambientes = Column(Integer, nullable=True)
+    estacionamientos = Column(Integer, nullable=True)
+    bodegas = Column(Integer, nullable=True)
+    piso = Column(Integer, nullable=True)
+    pisos_edificio = Column(Integer, nullable=True)
+
+    # Pricing extras
+    precio_anterior = Column(Numeric, nullable=True)
+    gastos_comunes = Column(Integer, nullable=True)
+
+    # Building / unit details
+    ano_construccion = Column('ano_construccion', Integer, nullable=True)
+    antiguedad = Column(Integer, nullable=True)
+    orientacion = Column(String(50), nullable=True)
+    vista = Column(String(100), nullable=True)
+    condicion = Column(String(50), nullable=True)  # nuevo/usado
+
+    # Location details
+    barrio = Column(String(150), nullable=True)
+    calle = Column(String(200), nullable=True)
+    numero = Column(String(50), nullable=True)
+    lat = Column(Numeric(10, 7), nullable=True)
+    lng = Column(Numeric(10, 7), nullable=True)
+
+    # Additional content
+    descripcion_html = Column(Text, nullable=True)
+
+    # Listing metrics / state
+    num_fotos = Column(Integer, nullable=True)
+    thumbnail_url = Column(Text, nullable=True)
+    visitas = Column(Integer, nullable=True)
+    estado_publicacion = Column(String(50), nullable=True)
+    fecha_publicacion = Column(DateTime, nullable=True)
+    fecha_actualizacion = Column(DateTime, nullable=True)
+
+    # Flexible / raw data
+    tags = Column(JSONB, nullable=True)
+    breadcrumbs = Column(JSONB, nullable=True)
+    raw_state = Column(JSONB, nullable=True)
+
+    # Metadata (mapped to actual DB columns)
+    scrapeado_en = Column('scraped_at', DateTime, nullable=True)  # DB: scraped_at
+    created_at = Column(DateTime, nullable=True)
+    actualizado_en = Column('updated_at', DateTime, nullable=True)  # DB: updated_at
     
     # Relationships
     features = relationship(
@@ -96,6 +141,18 @@ class Property(Base):
     )
     opportunities = relationship(
         "Opportunity",
+        back_populates="property",
+        cascade="all, delete-orphan",
+        lazy="dynamic"
+    )
+    amenities = relationship(
+        "Amenity",
+        back_populates="property",
+        cascade="all, delete-orphan",
+        lazy="dynamic"
+    )
+    services = relationship(
+        "Service",
         back_populates="property",
         cascade="all, delete-orphan",
         lazy="dynamic"

@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+
+{% block title %}Oportunidades del día - Portal Inmobiliario{% endblock %}
+
+{% block extra_head %}
+<style>
+    .score-ring {
+        width: 72px; height: 72px;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.5rem; font-weight: 800; color: white;
+        flex-shrink: 0;
+    }
+    .score-ring.excelente  { background: linear-gradient(135deg,#059669,#10b981); box-shadow: 0 0 0 4px #d1fae5; }
+    .score-ring.muy_buena  { background: linear-gradient(135deg,#2563eb,#3b82f6); box-shadow: 0 0 0 4px #dbeafe; }
+    .score-ring.buena      { background: linear-gradient(135deg,#d97706,#f59e0b); box-shadow: 0 0 0 4px #fef3c7; }
+    .score-ring.moderada   { background: linear-gradient(135deg,#64748b,#94a3b8); box-shadow: 0 0 0 4px #f1f5f9; }
+
+    .tipo-badge {
+        display: inline-block;
+        padding: 2px 10px; border-radius: 9999px;
+        font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+    }
+    .tipo-badge.excelente { background:#d1fae5; color:#065f46; }
+    .tipo-badge.muy_buena { background:#dbeafe; color:#1e40af; }
+    .tipo-badge.buena     { background:#fef3c7; color:#92400e; }
+    .tipo-badge.moderada  { background:#f1f5f9; color:#475569; }
+
+    .alert-icon.highlight  { color:#f59e0b; }
+    .alert-icon.new        { color:#10b981; }
+    .alert-icon.commune    { color:#3b82f6; }
+    .alert-icon.price_drop { color:#ef4444; }
+    .alert-icon.warning    { color:#94a3b8; }
+
+    .property-card { transition: transform .15s, box-shadow .15s; }
+    .property-card:hover { transform: translateY(-3px); box-shadow: 0 12px 24px -6px rgba(0,0,0,.12); }
+
+    .filter-btn { transition: background .15s, color .15s; }
+    .filter-btn.active { background:#1e293b; color:#fff; }
+
+    .reason-tag {
+        display: inline-block;
+        background: #f0fdf4; color: #166534;
+        border: 1px solid #bbf7d0;
+        border-radius: 6px;
+        padding: 2px 8px; font-size: 0.7rem;
+        margin: 2px 2px 2px 0;
+    }
+    .pipeline-spinner { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="opportunitiesApp()">
+
+    <!-- ── Header ── -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+            <span class="text-3xl">🔥</span>
+            <div>
+                <h1 class="text-2xl font-bold text-slate-900 leading-tight">Oportunidades del día</h1>
+                <p class="text-xs text-slate-500 mt-0.5"
+                   x-text="meta.last_updated ? 'Análisis: ' + formatDate(meta.last_updated) : 'Sin análisis reciente'"></p>
+            </div>
+        </div>
+        <div class="flex gap-2">
+            <button @click="runPipeline"
+                    :disabled="pipelineRunning"
+                    class="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 disabled:opacity-50">
+                <i data-lucide="zap" class="w-4 h-4" :class="pipelineRunning ? 'pipeline-spinner' : ''"></i>
+                <span x-text="pipelineRunning ? 'Analizando...' : 'Correr análisis'"></span>
+            </button>
+            <button @click="loadOpportunities"
+                    class="flex items-center gap-2 px-4 py-2 bg-slate-700 text-white text-sm rounded-lg hover:bg-slate-800">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                Actualizar
+            </button>
+        </div>
+    </div>
+
+    <!-- ── Filters ── -->
+    <div class="flex flex-wrap gap-2 items-center">
+        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Filtrar por tipo:</span>
+        <template x-for="t in tipoOptions" :key="t.value">
+            <button @click="setTipoFilter(t.value)"
+                    :class="['filter-btn px-3 py-1 rounded-full text-sm border border-slate-300 bg-white text-slate-700', activeTipo === t.value ? 'active' : '']"
+                    x-text="t.label"></button>
+        </template>
+    </div>
+
+    <!-- ── Summary Chips ── -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="bg-white border border-slate-200 rounded-xl p-4 text-center shadow-sm">
+            <p class="text-2xl font-bold text-slate-900" x-text="meta.total || 0"></p>
+            <p class="text-xs text-slate-500 mt-1">Total oportunidades</p>
+        </div>
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center shadow-sm">
+            <p class="text-2xl font-bold text-emerald-700" x-text="scoreSummary.excelente || 0"></p>
+            <p class="text-xs text-emerald-600 mt-1">Excelentes (>30%)</p>
+        </div>
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center shadow-sm">
+            <p class="text-2xl font-bold text-blue-700" x-text="scoreSummary.muy_buena || 0"></p>
+            <p class="text-xs text-blue-600 mt-1">Muy buenas (>20%)</p>
+        </div>
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center shadow-sm">
+            <p class="text-2xl font-bold text-amber-700" x-text="(scoreSummary.buena || 0) + (scoreSummary.moderada || 0)"></p>
+            <p class="text-xs text-amber-600 mt-1">Buenas / Moderadas</p>
+        </div>
+    </div>
+
+    <!-- ── Featured Opportunity ── -->
+    <div x-show="featured" class="bg-white rounded-xl shadow-lg p-6 border-2 border-emerald-200">
+        <div class="flex items-center gap-2 mb-4">
+            <span class="text-lg">⭐</span>
+            <h2 class="text-base font-bold text-slate-700 uppercase tracking-wide">Mejor oportunidad del día</h2>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Score -->
+            <div class="flex flex-col items-center justify-center gap-3">
+                <div :class="['score-ring', featured?.tipo_oportunidad || 'moderada']"
+                     x-text="featured?.score || 0"></div>
+                <span :class="['tipo-badge', featured?.tipo_oportunidad || 'moderada']"
+                      x-text="tipoLabel(featured?.tipo_oportunidad)"></span>
+                <div class="text-center">
+                    <p class="text-xs text-slate-500">Precio/m²</p>
+                    <p class="font-bold text-slate-800" x-text="formatPrice(featured?.precio_m2)"></p>
+                    <p class="text-xs text-slate-400">prom. <span x-text="formatPrice(featured?.precio_m2_promedio_comuna)"></span></p>
+                </div>
+            </div>
+
+            <!-- Property Info -->
+            <div class="space-y-3">
+                <h3 class="text-xl font-bold text-slate-900 leading-tight" x-text="featured?.property?.titulo"></h3>
+                <p class="text-3xl font-bold text-slate-900" x-text="formatPrice(featured?.property?.precio)"></p>
+                <div class="inline-block bg-emerald-100 text-emerald-800 text-sm font-semibold px-3 py-1 rounded-full"
+                     x-text="'-' + (featured?.diferencia_porcentual || 0) + '% bajo mercado'"></div>
+                <div class="flex flex-wrap gap-3 text-sm text-slate-600 mt-2">
+                    <span class="flex items-center gap-1">
+                        <i data-lucide="map-pin" class="w-3.5 h-3.5"></i>
+                        <span x-text="featured?.property?.comuna"></span>
+                    </span>
+                    <span class="flex items-center gap-1">
+                        <i data-lucide="bed" class="w-3.5 h-3.5"></i>
+                        <span x-text="(featured?.property?.dormitorios || 0) + ' dorm'"></span>
+                    </span>
+                    <span class="flex items-center gap-1">
+                        <i data-lucide="maximize" class="w-3.5 h-3.5"></i>
+                        <span x-text="(featured?.property?.superficie_total || 0) + ' m²'"></span>
+                    </span>
+                </div>
+                <!-- Reasons -->
+                <div class="mt-2">
+                    <template x-for="reason in (featured?.razones || [])" :key="reason">
+                        <span class="reason-tag" x-text="reason"></span>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex flex-col justify-center gap-3">
+                <button @click="viewDetail(featured?.property?.id)"
+                        class="w-full px-4 py-3 bg-slate-700 text-white rounded-lg hover:bg-slate-800 font-medium">
+                    Ver detalle completo
+                </button>
+                <button @click="openPublication(featured?.property)"
+                        class="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+                    Abrir en portal
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Main Grid ── -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- Left: Top list -->
+        <div class="lg:col-span-2 space-y-6">
+
+            <!-- Top opportunities list -->
+            <div class="bg-white rounded-xl shadow p-6 border border-slate-200">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="trending-up" class="w-5 h-5 text-slate-700"></i>
+                        <h2 class="text-lg font-semibold text-slate-900">Top oportunidades</h2>
+                    </div>
+                    <span class="text-xs text-slate-400" x-text="topList.length + ' resultados'"></span>
+                </div>
+
+                <div x-show="loading" class="flex justify-center py-8">
+                    <div class="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                </div>
+
+                <div x-show="!loading" class="space-y-3">
+                    <template x-for="(opp, index) in topList" :key="opp.id">
+                        <div class="flex items-start gap-4 p-3 rounded-xl hover:bg-slate-50 cursor-pointer border border-transparent hover:border-slate-200 transition-all"
+                             @click="viewDetail(opp.property.id)">
+
+                            <!-- Rank + Score -->
+                            <div class="flex flex-col items-center gap-1 min-w-[56px]">
+                                <span class="text-xs font-bold text-slate-400" x-text="'#' + (index + 1)"></span>
+                                <div :class="['score-ring', opp.tipo_oportunidad]" style="width:52px;height:52px;font-size:1.1rem"
+                                     x-text="opp.score"></div>
+                            </div>
+
+                            <!-- Info -->
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 mb-1 flex-wrap">
+                                    <span class="font-semibold text-slate-900 truncate" x-text="opp.property.titulo"></span>
+                                    <span :class="['tipo-badge', opp.tipo_oportunidad]" x-text="tipoLabel(opp.tipo_oportunidad)"></span>
+                                </div>
+                                <div class="flex flex-wrap gap-3 text-xs text-slate-500 mb-2">
+                                    <span x-text="opp.property.comuna"></span>
+                                    <span x-text="(opp.property.dormitorios || 0) + ' dorm · ' + (opp.property.superficie_total || 0) + ' m²'"></span>
+                                </div>
+                                <div class="flex flex-wrap gap-1">
+                                    <template x-for="reason in (opp.razones || []).slice(0, 2)" :key="reason">
+                                        <span class="reason-tag" x-text="reason"></span>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <!-- Price -->
+                            <div class="text-right shrink-0">
+                                <p class="font-bold text-slate-900" x-text="formatPrice(opp.property.precio)"></p>
+                                <p class="text-xs text-emerald-600 font-semibold"
+                                   x-text="'-' + opp.diferencia_porcentual + '%'"></p>
+                                <p class="text-xs text-slate-400" x-text="formatPrice(opp.precio_m2) + '/m²'"></p>
+                            </div>
+                        </div>
+                    </template>
+
+                    <div x-show="topList.length === 0 && !loading"
+                         class="text-center py-8 text-slate-400">
+                        <i data-lucide="inbox" class="w-10 h-10 mx-auto mb-2 opacity-40"></i>
+                        <p>No hay oportunidades con estos filtros</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Communes with opportunities -->
+            <div class="bg-white rounded-xl shadow p-6 border border-slate-200">
+                <div class="flex items-center gap-2 mb-4">
+                    <i data-lucide="map" class="w-5 h-5 text-slate-700"></i>
+                    <h2 class="text-lg font-semibold text-slate-900">Comunas con más oportunidades</h2>
+                </div>
+                <div class="space-y-2">
+                    <div class="grid grid-cols-4 gap-2 pb-2 border-b border-slate-100 text-xs font-semibold text-slate-500 uppercase">
+                        <div>Comuna</div>
+                        <div class="text-right">Opps</div>
+                        <div class="text-right">Score prom.</div>
+                        <div class="text-right">Dif. mercado</div>
+                    </div>
+                    <template x-for="c in communes" :key="c.name">
+                        <div class="grid grid-cols-4 gap-2 py-2 border-b border-slate-50 text-sm items-center hover:bg-slate-50 rounded cursor-pointer"
+                             @click="setComunaFilter(c.name)">
+                            <div class="font-medium text-slate-800" x-text="c.name"></div>
+                            <div class="text-right text-slate-600" x-text="c.count"></div>
+                            <div class="text-right">
+                                <span :class="scoreColor(c.avg_score)" x-text="c.avg_score"></span>
+                            </div>
+                            <div class="text-right text-emerald-600 font-semibold"
+                                 x-text="'-' + c.avg_diff_pct + '%'"></div>
+                        </div>
+                    </template>
+                    <div x-show="communes.length === 0" class="text-center py-4 text-slate-400 text-sm">Sin datos de comunas</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Alerts + Market Stats -->
+        <div class="space-y-6">
+
+            <!-- Dynamic Alerts -->
+            <div class="bg-white rounded-xl shadow p-6 border border-slate-200">
+                <div class="flex items-center gap-2 mb-4">
+                    <i data-lucide="bell" class="w-5 h-5 text-slate-700"></i>
+                    <h2 class="text-lg font-semibold text-slate-900">Alertas del día</h2>
+                </div>
+                <div class="space-y-3">
+                    <template x-for="alert in alerts" :key="alert.message">
+                        <div class="flex items-start gap-2 p-3 rounded-lg border"
+                             :class="alertClass(alert.type)">
+                            <i :data-lucide="alertIcon(alert.type)"
+                               :class="['w-4 h-4 mt-0.5 shrink-0 alert-icon', alert.type]"></i>
+                            <p class="text-sm text-slate-700 leading-snug" x-text="alert.message"></p>
+                        </div>
+                    </template>
+                    <div x-show="alerts.length === 0" class="text-sm text-slate-400 text-center py-4">Sin alertas activas</div>
+                </div>
+            </div>
+
+            <!-- Market Stats -->
+            <div class="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl shadow p-6 text-white">
+                <div class="flex items-center gap-2 mb-4">
+                    <i data-lucide="bar-chart-3" class="w-5 h-5 text-slate-300"></i>
+                    <h2 class="text-lg font-semibold">Mercado actual</h2>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <p class="text-xs text-slate-400">Precio promedio/m² (comunas)</p>
+                        <p class="text-2xl font-bold" x-text="formatPrice(marketStats?.avg_price_m2)"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-400">Propiedades en análisis</p>
+                        <p class="text-2xl font-bold" x-text="marketStats?.total_properties || 0"></p>
+                    </div>
+                    <div class="border-t border-slate-700 pt-4">
+                        <p class="text-xs text-slate-400 mb-2">Distribución de oportunidades</p>
+                        <template x-for="[tipo, count] in Object.entries(scoreSummary)" :key="tipo">
+                            <div class="flex justify-between text-sm py-0.5">
+                                <span :class="['tipo-badge', tipo]" x-text="tipoLabel(tipo)"></span>
+                                <span class="font-semibold" x-text="count"></span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active filters -->
+            <div x-show="activeTipo || activaComuna" class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <p class="text-xs font-semibold text-amber-700 mb-2">Filtros activos</p>
+                <div class="flex flex-wrap gap-2">
+                    <span x-show="activeTipo"
+                          class="inline-flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-800 text-xs rounded-full">
+                        Tipo: <span x-text="tipoLabel(activeTipo)"></span>
+                        <button @click="setTipoFilter(null)" class="ml-1 hover:text-red-600">✕</button>
+                    </span>
+                    <span x-show="activaComuna"
+                          class="inline-flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-800 text-xs rounded-full">
+                        Comuna: <span x-text="activaComuna"></span>
+                        <button @click="setComunaFilter(null)" class="ml-1 hover:text-red-600">✕</button>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script src="{{ url_for('static', filename='js/opportunities.js') }}"></script>
+{% endblock %}

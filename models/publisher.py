@@ -2,7 +2,7 @@
 Publisher model for property publishers/contact info.
 """
 
-from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, ForeignKey
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -36,8 +36,13 @@ class Publisher(Base):
     nombre = Column(String(200), nullable=True)
     telefono = Column(String(50), nullable=True)
     email = Column(String(200), nullable=True)
-    tipo = Column(String(50), nullable=True)  # inmobiliaria, particular
-    
+    tipo = Column(String(50), nullable=True)  # inmobiliaria, particular, constructora
+    logo_url = Column(Text, nullable=True)
+    perfil_url = Column(Text, nullable=True)
+    reputacion = Column(String(50), nullable=True)
+    publicaciones_activas = Column(Integer, nullable=True)
+    antiguedad_portal = Column(String(50), nullable=True)
+
     # Relationship
     property = relationship("Property", back_populates="publisher")
     

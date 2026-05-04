@@ -455,6 +455,12 @@ Tipos disponibles: departamento, casa, oficina, terreno, local-comercial, bodega
         help='Persistir propiedades en PostgreSQL (requiere DATABASE_URL configurado)'
     )
     
+    parser.add_argument(
+        '--execution-id',
+        type=str,
+        help='ID de ejecución para tracking en BD (generado automáticamente si no se proporciona)'
+    )
+    
     args = parser.parse_args()
     
     # Configurar logging verbose si se solicita
@@ -471,6 +477,16 @@ Tipos disponibles: departamento, casa, oficina, terreno, local-comercial, bodega
         # Manual scraping mode
         if not args.operacion or not args.tipo:
             parser.error("--operacion y --tipo son requeridos para scraping manual (usa --help para ver opciones de scheduler)")
+        
+        # Initialize execution tracker if execution_id provided
+        tracker = None
+        if args.execution_id:
+            try:
+                from execution_tracker import ExecutionTracker
+                tracker = ExecutionTracker(execution_id=args.execution_id)
+                logger.info(f"📊 Tracking habilitado con execution_id: {args.execution_id}")
+            except Exception as e:
+                logger.warning(f"No se pudo inicializar tracker: {e}")
         
         try:
             logger.info("=" * 60)
@@ -504,6 +520,8 @@ Tipos disponibles: departamento, casa, oficina, terreno, local-comercial, bodega
             
             if not properties:
                 logger.warning("No se encontraron propiedades")
+                if tracker:
+                    tracker.update_metrics(properties_scraped=0, pages_processed=0)
                 sys.exit(0)
             
             # Inicializar deduplicador
@@ -520,7 +538,10 @@ Tipos disponibles: departamento, casa, oficina, terreno, local-comercial, bodega
                 logger.info("🗑️  Registro de duplicados reseteado")
             
             # Procesar propiedades con deduplicación
+            properties_before = len(properties)
             properties = deduplicator.process_properties(properties)
+            properties_new = len([p for p in properties if p.get('_is_new', False)])
+            properties_updated = properties_before - properties_new
             
             # Filtrar duplicados si se solicita
             if args.exclude_duplicates:
@@ -530,6 +551,15 @@ Tipos disponibles: departamento, casa, oficina, terreno, local-comercial, bodega
             
             # Guardar registro actualizado
             deduplicator.save_registry()
+            
+            # Update tracker metrics
+            if tracker:
+                tracker.update_metrics(
+                    properties_scraped=len(properties),
+                    properties_new=properties_new,
+                    properties_updated=properties_updated,
+                    pages_processed=scraper.pages_scraped if hasattr(scraper, 'pages_scraped') else 0
+                )
             
             exporter = DataExporter()
             
@@ -548,10 +578,14 @@ Tipos disponibles: departamento, casa, oficina, terreno, local-comercial, bodega
             
         except KeyboardInterrupt:
             logger.info("\n⚠️  Scraping interrumpido por el usuario")
+            if tracker:
+                tracker.complete_execution(status='cancelled', error_message='Interrumpido por el usuario')
             sys.exit(1)
             
         except Exception as e:
             logger.error(f"❌ Error: {e}", exc_info=args.verbose)
+            if tracker:
+                tracker.complete_execution(status='failed', error_message=str(e))
             sys.exit(1)
 
 

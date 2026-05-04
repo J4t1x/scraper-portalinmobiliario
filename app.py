@@ -33,6 +33,10 @@ socketio = SocketIO(app, async_mode=FlaskConfig.SOCKETIO_ASYNC_MODE, cors_allowe
 app.register_blueprint(bp)
 app.register_blueprint(scheduler_bp)
 
+# Register SLM routes
+from api.slm_routes import slm_bp
+app.register_blueprint(slm_bp)
+
 # Register RESTX API
 from api import init_api
 init_api(app)

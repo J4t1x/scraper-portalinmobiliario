@@ -12,8 +12,8 @@ from datetime import datetime
 from typing import Optional, Dict, Any, List
 from contextlib import contextmanager
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.jobstores.memory import MemoryJobStore
 from apscheduler.executors.pool import ThreadPoolExecutor, ProcessPoolExecutor
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR, EVENT_JOB_MISSED
 from apscheduler.jobstores.base import JobLookupError
@@ -54,9 +54,9 @@ class ScraperScheduler:
         
         self.scheduler_id = scheduler_id or f"scraper-scheduler-{uuid.uuid4()}"
         
-        # Configure job store with PostgreSQL
+        # Configure job stores (using MemoryJobStore for compatibility with nested functions)
         jobstores = {
-            'default': SQLAlchemyJobStore(url=database_url, tablename='apscheduler_jobs')
+            'default': MemoryJobStore()
         }
         
         # Configure executors for concurrent job execution
@@ -73,8 +73,8 @@ class ScraperScheduler:
             'replace_existing': True  # Replace job if it already exists
         }
         
-        # Create scheduler
-        self.scheduler = AsyncIOScheduler(
+        # Create scheduler (BackgroundScheduler for Flask-SocketIO compatibility)
+        self.scheduler = BackgroundScheduler(
             jobstores=jobstores,
             executors=executors,
             job_defaults=job_defaults,
@@ -218,12 +218,22 @@ class ScraperScheduler:
         """
         jobs = []
         for job in self.scheduler.get_jobs():
+            try:
+                next_run = job.next_run_time.isoformat() if hasattr(job, 'next_run_time') and job.next_run_time else None
+            except AttributeError:
+                next_run = None
+            
+            try:
+                max_inst = job.max_instances if hasattr(job, 'max_instances') else 1
+            except AttributeError:
+                max_inst = 1
+                
             jobs.append({
                 'id': job.id,
                 'name': job.name,
-                'next_run_time': job.next_run_time.isoformat() if job.next_run_time else None,
+                'next_run_time': next_run,
                 'trigger': str(job.trigger),
-                'max_instances': job.max_instances
+                'max_instances': max_inst
             })
         return jobs
     
@@ -239,13 +249,24 @@ class ScraperScheduler:
         """
         try:
             job = self.scheduler.get_job(job_id)
-            return {
-                'id': job.id,
-                'name': job.name,
-                'next_run_time': job.next_run_time.isoformat() if job.next_run_time else None,
-                'trigger': str(job.trigger),
-                'max_instances': job.max_instances
-            }
+            if job:
+                try:
+                    next_run = job.next_run_time.isoformat() if hasattr(job, 'next_run_time') and job.next_run_time else None
+                except AttributeError:
+                    next_run = None
+                
+                try:
+                    max_inst = job.max_instances if hasattr(job, 'max_instances') else 1
+                except AttributeError:
+                    max_inst = 1
+                    
+                return {
+                    'id': job.id,
+                    'name': job.name,
+                    'next_run_time': next_run,
+                    'trigger': str(job.trigger),
+                    'max_instances': max_inst
+                }
         except JobLookupError:
             return None
     
